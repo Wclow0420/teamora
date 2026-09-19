@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: teamora-api
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/teamora}
+    username: ${SPRING_DATASOURCE_USERNAME:teamora}
+    password: ${SPRING_DATASOURCE_PASSWORD:teamora}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Schema is owned by Flyway; JPA only validates it matches the entities.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Kuala_Lumpur
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+  error:
+    include-message: always
+
+teamora:
+  # Demo data seeding (idempotent — only runs when the DB is empty).
+  seed: ${TEAMORA_SEED:true}
+  jwt:
+    # HS256 secret — MUST be overridden in production (>= 256 bits).
+    secret: ${TEAMORA_JWT_SECRET:dev-only-secret-change-me-please-0123456789abcdef0123456789abcdef}
+    access-token-ttl-minutes: 30
+    refresh-token-ttl-days: 14
+  cors:
+    # Comma-separated allowed origins for the mobile/web clients.
+    allowed-origins: ${TEAMORA_CORS_ORIGINS:*}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.springframework.security: INFO

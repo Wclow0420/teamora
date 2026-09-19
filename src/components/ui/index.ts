@@ -1,0 +1,22 @@
+/** Barrel export for the UI kit — import everything from '@/components/ui'. */
+export { Icon } from './Icon';
+export type { IconName } from './Icon';
+export { Card } from './Card';
+export { Chip } from './Chip';
+export { Button } from './Button';
+export { Avatar } from './Avatar';
+export { IconTile } from './IconTile';
+export { ProgressBar } from './ProgressBar';
+export { StatTile } from './StatTile';
+export { SectionLabel } from './SectionLabel';
+export { Placeholder } from './Placeholder';
+export { ScreenHeader } from './ScreenHeader';
+export { BarChart } from './BarChart';
+export { LiveDot } from './LiveDot';
+export { TextField } from './TextField';
+export { SelectChips } from './SelectChips';
+export type { SelectOption } from './SelectChips';
+export { DateField, toISODate } from './DateField';
+export { EmptyState } from './EmptyState';
+export type { EmptyStateProps } from './EmptyState';
+export { HeroCard } from './HeroCard';

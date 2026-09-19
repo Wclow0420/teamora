@@ -1,0 +1,53 @@
+# Config comes from `.env` (see .env.example). Compose auto-loads `.env` in this
+# directory for ${VAR} substitution; defaults below keep it working without one.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: teamora-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-teamora}
+      POSTGRES_USER: ${POSTGRES_USER:-teamora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teamora}
+    ports:
+      # Host ${DB_HOST_PORT} → container 5432 (5435 avoids clashing with other
+      # local Postgres instances).
+      - "${DB_HOST_PORT:-5435}:5432"
+    volumes:
+      - teamora-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teamora} -d ${POSTGRES_DB:-teamora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: teamora-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-teamora}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-teamora}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-teamora}
+      TEAMORA_JWT_SECRET: ${TEAMORA_JWT_SECRET:-change-me-in-prod-this-is-a-dev-only-256-bit-secret-key-0123456789}
+      TEAMORA_CORS_ORIGINS: ${TEAMORA_CORS_ORIGINS:-*}
+      TEAMORA_SEED: ${TEAMORA_SEED:-true}
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: ${SEC_LOG:-INFO}
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: teamora-pgadmin
+    depends_on:
+      - db
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@teamora.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+
+volumes:
+  teamora-pgdata:
