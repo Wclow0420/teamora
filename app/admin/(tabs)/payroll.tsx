@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
 import { Avatar, Button, Card, Chip, Icon, SectionLabel } from '@/components/ui';
@@ -32,6 +33,7 @@ function statusChipColors(status: PayslipStatus): { color: string; background: s
 }
 
 export default function Payroll() {
+  const router = useRouter();
   const period = currentPeriod();
   const q = usePayrollRun(period);
   const run = useRunPayroll();
@@ -82,16 +84,26 @@ export default function Payroll() {
       <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
         {data && (data.generated ? <RunView data={data} /> : <EmptyState busy={busy} onRun={onRun} />)}
         {data?.generated && (
-          <Actions
-            data={data}
-            busy={busy}
-            onApprove={onApprove}
-            onMarkPaid={onMarkPaid}
-            onReRun={onRun}
-            running={run.isPending}
-            approving={approve.isPending}
-            paying={markPaid.isPending}
-          />
+          <>
+            <Actions
+              data={data}
+              busy={busy}
+              onApprove={onApprove}
+              onMarkPaid={onMarkPaid}
+              onReRun={onRun}
+              running={run.isPending}
+              approving={approve.isPending}
+              paying={markPaid.isPending}
+            />
+            <Button
+              label="Reports & export"
+              variant="ghost"
+              icon="download"
+              disabled={busy}
+              onPress={() => router.push({ pathname: '/admin/payroll-export', params: { period } })}
+              style={{ marginTop: 12 }}
+            />
+          </>
         )}
       </AsyncBoundary>
     </CollapsingHeaderScreen>
@@ -270,6 +282,7 @@ function RunView({ data }: { data: PayrollRun }) {
                     { k: 'Basic', v: line.basicLabel },
                     { k: 'OT', v: line.overtimeLabel },
                     { k: 'Claims', v: line.claimsLabel },
+                    ...(line.unpaidDeductionLabel ? [{ k: 'Unpaid', v: `− RM ${line.unpaidDeductionLabel}` }] : []),
                     { k: 'Deductions', v: line.deductionsLabel },
                   ].map((m) => (
                     <View key={m.k} style={{ flexDirection: 'row', gap: 4 }}>

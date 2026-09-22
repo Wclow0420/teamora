@@ -23,10 +23,13 @@ public class EmployeeController {
     private final EmployeeService employeeService;
     private final CurrentEmployeeService currentEmployee;
 
-    /** Current signed-in employee's own profile. */
+    /** Current signed-in employee's own profile. Uses the full detail builder so
+     *  the caller can see their own work-location assignment (needed for the
+     *  geofenced clock-in) and effective compensation. */
     @GetMapping("/me")
     public EmployeeResponse me() {
-        return EmployeeResponse.from(currentEmployee.require());
+        Employee caller = currentEmployee.require();
+        return employeeService.get(caller.getCompany().getId(), caller.getId());
     }
 
     /** Directory listing — management roles only, scoped to the caller's company. */

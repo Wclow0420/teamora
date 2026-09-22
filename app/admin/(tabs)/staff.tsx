@@ -95,7 +95,7 @@ export default function Staff() {
                 onPress={() =>
                   router.push({
                     pathname: '/admin/employee-edit',
-                    params: { id: e.id, name: e.fullName, email: e.email, jobTitle: e.jobTitle ?? '', department: e.department ?? '', role: e.role, reportingManagerId: e.reportingManagerId ?? '', monthlySalary: e.monthlySalary != null ? String(e.monthlySalary) : '', maritalStatus: e.maritalStatus ?? '', spouseWorking: e.spouseWorking != null ? String(e.spouseWorking) : '', numChildren: String(e.numChildren) },
+                    params: { id: e.id, name: e.fullName, email: e.email, jobTitle: e.jobTitle ?? '', department: e.department ?? '', role: e.role, reportingManagerId: e.reportingManagerId ?? '', workLocationId: e.workLocationId ?? '', workLocationName: e.workLocationName ?? '', monthlySalary: e.monthlySalary != null ? String(e.monthlySalary) : '', maritalStatus: e.maritalStatus ?? '', spouseWorking: e.spouseWorking != null ? String(e.spouseWorking) : '', numChildren: String(e.numChildren), payBasis: e.payBasis ?? '', workingDays: e.workingDays != null ? String(e.workingDays) : '', hoursPerDay: e.hoursPerDay != null ? String(e.hoursPerDay) : '' },
                   })
                 }
               >

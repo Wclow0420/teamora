@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { ScreenHeader, Button, TextField, SelectChips, type SelectOption } from '@/components/ui';
 import { ReportingManagerField } from '@/components/ReportingManagerField';
-import { useCreateEmployee } from '@/api/queries';
+import { WorkLocationField } from '@/components/WorkLocationField';
+import { CompensationFields } from '@/components/CompensationFields';
+import { StatutoryBankFields } from '@/components/StatutoryBankFields';
+import { useCompanySettings, useCreateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
-import type { MaritalStatus, Role } from '@/api/types';
+import type { MaritalStatus, PayBasis, Role } from '@/api/types';
+import { WEEKDAYS_MASK } from '@/lib/workweek';
 import { palette, font } from '@/theme';
 
 type NewRole = Extract<Role, 'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'>;
@@ -43,9 +47,18 @@ function parseSalary(text: string): number | undefined {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
+/** Parse an hours-per-day input → a positive number, or undefined if blank/invalid. */
+function parseHours(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export default function EmployeeNew() {
   const router = useRouter();
   const create = useCreateEmployee();
+  const settings = useCompanySettings();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -55,10 +68,33 @@ export default function EmployeeNew() {
   const [department, setDepartment] = useState('');
   const [salary, setSalary] = useState('');
   const [reportingManagerId, setReportingManagerId] = useState<string | undefined>(undefined);
+  const [workLocationId, setWorkLocationId] = useState<string | undefined>(undefined);
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>('SINGLE');
   const [spouseWorking, setSpouseWorking] = useState<'WORKING' | 'NOT_WORKING'>('NOT_WORKING');
   const [children, setChildren] = useState('');
+  // Statutory & bank identity (all optional).
+  const [nric, setNric] = useState('');
+  const [epfNo, setEpfNo] = useState('');
+  const [socsoNo, setSocsoNo] = useState('');
+  const [taxNo, setTaxNo] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNo, setBankAccountNo] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Compensation — seeded from the company defaults once they load (until touched).
+  const [payBasis, setPayBasis] = useState<PayBasis>('MONTHLY');
+  const [workingDays, setWorkingDays] = useState<number>(WEEKDAYS_MASK);
+  const [hoursPerDay, setHoursPerDay] = useState('8');
+  const [seeded, setSeeded] = useState(false);
+
+  useEffect(() => {
+    if (!seeded && settings.data) {
+      setPayBasis(settings.data.defaultPayBasis);
+      setWorkingDays(settings.data.defaultWorkingDays);
+      setHoursPerDay(String(settings.data.defaultHoursPerDay));
+      setSeeded(true);
+    }
+  }, [seeded, settings.data]);
 
   const onSubmit = async () => {
     setError(null);
@@ -86,9 +122,19 @@ export default function EmployeeNew() {
         department: department.trim() || undefined,
         monthlySalary,
         reportingManagerId,
+        workLocationId,
         maritalStatus,
         spouseWorking: maritalStatus === 'MARRIED' ? spouseWorking === 'WORKING' : undefined,
         numChildren,
+        payBasis,
+        workingDays,
+        hoursPerDay: parseHours(hoursPerDay),
+        nric: nric.trim() || undefined,
+        epfNo: epfNo.trim() || undefined,
+        socsoNo: socsoNo.trim() || undefined,
+        taxNo: taxNo.trim() || undefined,
+        bankName: bankName.trim() || undefined,
+        bankAccountNo: bankAccountNo.trim() || undefined,
       });
       router.back();
     } catch (e) {
@@ -123,6 +169,17 @@ export default function EmployeeNew() {
           placeholder="e.g. 3500"
         />
         <ReportingManagerField value={reportingManagerId} onChange={setReportingManagerId} />
+        <WorkLocationField value={workLocationId} onChange={setWorkLocationId} />
+
+        <CompensationFields
+          monthlySalary={parseSalary(salary) ?? null}
+          payBasis={payBasis}
+          onPayBasis={setPayBasis}
+          workingDays={workingDays}
+          onWorkingDays={setWorkingDays}
+          hoursPerDay={hoursPerDay}
+          onHoursPerDay={setHoursPerDay}
+        />
 
         <View style={{ gap: 14, marginTop: 4 }}>
           <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>Tax profile</Text>
@@ -141,6 +198,21 @@ export default function EmployeeNew() {
             placeholder="e.g. 2"
           />
         </View>
+
+        <StatutoryBankFields
+          nric={nric}
+          onNric={setNric}
+          epfNo={epfNo}
+          onEpfNo={setEpfNo}
+          socsoNo={socsoNo}
+          onSocsoNo={setSocsoNo}
+          taxNo={taxNo}
+          onTaxNo={setTaxNo}
+          bankName={bankName}
+          onBankName={setBankName}
+          bankAccountNo={bankAccountNo}
+          onBankAccountNo={setBankAccountNo}
+        />
 
         {error && <Text style={{ color: palette.danger, fontSize: 12.5 }}>{error}</Text>}
 

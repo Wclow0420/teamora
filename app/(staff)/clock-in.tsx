@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { Button, Chip, Icon, IconTile, LiveDot } from '@/components/ui';
 import { useClockIn, useMe } from '@/api/queries';
 import { ApiError } from '@/api/client';
+import { getCurrentCoords, LocationError } from '@/lib/location';
+import { captureSelfieBase64 } from '@/lib/selfie';
 import { pad2 } from '@/hooks';
 import { palette, font, radius, gradients } from '@/theme';
 
@@ -25,7 +28,24 @@ export default function ClockIn() {
   const router = useRouter();
   const clockIn = useClockIn();
   const me = useMe();
+  const cameraRef = React.useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraReady, setCameraReady] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [locating, setLocating] = React.useState(false);
+  const [capturing, setCapturing] = React.useState(false);
+
+  const cameraGranted = permission?.granted ?? false;
+
+  // Ask for camera access when the screen comes into focus (not on mount, so a
+  // returning user gets re-prompted only where the system allows it).
+  useFocusEffect(
+    React.useCallback(() => {
+      if (permission && !permission.granted && permission.canAskAgain) {
+        void requestPermission();
+      }
+    }, [permission, requestPermission]),
+  );
 
   // Live clock — refreshes the displayed time without a heavy per-second re-render.
   const [now, setNow] = React.useState(() => new Date());
@@ -35,14 +55,58 @@ export default function ClockIn() {
   }, []);
   const { hm, ampm } = clockParts(now);
   const dateLong = `${DAYS_LONG[now.getDay()]}, ${now.getDate()} ${MONTHS_LONG[now.getMonth()]}`;
-  const workLocation = me.data?.location ?? me.data?.companyName ?? 'Your workplace';
+
+  // An assigned site → geofenced clock-in (we must send coords).
+  const assignedSite = me.data?.workLocationName ?? null;
+  const workLocation = assignedSite ?? me.data?.location ?? me.data?.companyName ?? 'Your workplace';
+  const locationSubtitle = assignedSite ? 'Verify you are on-site to clock in' : 'Your work location';
+
+  const busy = clockIn.isPending || locating || capturing;
 
   const handleClockIn = async () => {
     setErrorMsg(null);
+
+    // Best-effort selfie — never blocks the clock-in. Absent/denied camera → no photo.
+    let photoBase64: string | undefined;
+    if (cameraGranted && cameraReady) {
+      setCapturing(true);
+      const shot = await captureSelfieBase64(cameraRef.current);
+      setCapturing(false);
+      if (shot) photoBase64 = shot;
+    }
+
+    // No assigned site → clock in anywhere (no geofence, no location prompt).
+    if (!me.data?.workLocationId) {
+      try {
+        await clockIn.mutateAsync(photoBase64 ? { photoBase64 } : {});
+        if (router.canGoBack()) router.back();
+      } catch (e) {
+        setErrorMsg(e instanceof ApiError ? e.message : 'Could not clock in. Please try again.');
+      }
+      return;
+    }
+
+    // Assigned site → capture coordinates for the server-side geofence check.
+    setLocating(true);
+    let coords: { latitude: number; longitude: number };
     try {
-      await clockIn.mutateAsync();
+      coords = await getCurrentCoords();
+    } catch (e) {
+      setLocating(false);
+      if (e instanceof LocationError && e.kind === 'denied') {
+        setErrorMsg('Location is needed to clock in at your work site. Enable location for Teamora in Settings, then try again.');
+      } else {
+        setErrorMsg('Could not get your location. Move to an open area and try again.');
+      }
+      return;
+    }
+    setLocating(false);
+
+    try {
+      await clockIn.mutateAsync({ ...coords, ...(photoBase64 ? { photoBase64 } : {}) });
       if (router.canGoBack()) router.back();
     } catch (e) {
+      // Includes the server "out of range" message (distance + site name).
       setErrorMsg(e instanceof ApiError ? e.message : 'Could not clock in. Please try again.');
     }
   };
@@ -88,7 +152,7 @@ export default function ClockIn() {
           </Text>
         </View>
 
-        {/* face viewfinder */}
+        {/* selfie viewfinder — live front camera, gated on permission */}
         <View style={{ width: 232, height: 232, alignSelf: 'center', marginTop: 26 }}>
           <View
             style={{
@@ -100,7 +164,7 @@ export default function ClockIn() {
               borderRadius: 999,
               borderWidth: 2,
               borderStyle: 'dashed',
-              borderColor: 'rgba(236,106,77,0.53)',
+              borderColor: cameraGranted ? 'rgba(92,144,112,0.6)' : 'rgba(236,106,77,0.53)',
             }}
           />
           <View
@@ -116,24 +180,41 @@ export default function ClockIn() {
               justifyContent: 'center',
             }}
           >
-            <LinearGradient
-              colors={['#5a463a', '#2a211b']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            />
-            <Icon name="face" size={92} color="rgba(255,255,255,0.2)" stroke={1.2} />
+            {cameraGranted ? (
+              <CameraView
+                ref={cameraRef}
+                facing="front"
+                onCameraReady={() => setCameraReady(true)}
+                style={{ width: '100%', height: '100%' }}
+              />
+            ) : (
+              <>
+                <LinearGradient
+                  colors={['#5a463a', '#2a211b']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                />
+                <Icon name="face" size={92} color="rgba(255,255,255,0.2)" stroke={1.2} />
+              </>
+            )}
           </View>
         </View>
 
-        {/* scanning chip */}
+        {/* viewfinder status */}
         <View style={{ alignItems: 'center', marginTop: 22 }}>
-          <Chip
-            label="Scanning your face…"
-            background="rgba(255,255,255,0.12)"
-            color={palette.white}
-            leading={<LiveDot color={palette.amber} />}
-          />
+          {cameraGranted ? (
+            <Chip
+              label="Center your face in the frame"
+              background="rgba(255,255,255,0.12)"
+              color={palette.white}
+              leading={<LiveDot color={palette.sage} />}
+            />
+          ) : (
+            <Text style={[font(500), { fontSize: 12, color: palette.white, opacity: 0.6, textAlign: 'center' }]}>
+              Camera is off — you'll clock in without a photo.
+            </Text>
+          )}
         </View>
 
         {/* flexible spacer to push location card to bottom */}
@@ -154,7 +235,7 @@ export default function ClockIn() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[font(700), { fontSize: 14, color: palette.white }]} numberOfLines={1}>{workLocation}</Text>
             <Text style={[font(500), { fontSize: 12, color: palette.white, opacity: 0.6, marginTop: 5 }]}>
-              Your work location
+              {locationSubtitle}
             </Text>
           </View>
         </View>
@@ -166,12 +247,20 @@ export default function ClockIn() {
           </Text>
         )}
         <Button
-          label={clockIn.isPending ? 'Verifying…' : 'Verify & Clock In'}
+          label={
+            capturing
+              ? 'Taking photo…'
+              : locating
+                ? 'Checking location…'
+                : clockIn.isPending
+                  ? 'Verifying…'
+                  : 'Verify & Clock In'
+          }
           icon="fingerprint"
           height={56}
           style={{ marginTop: 14 }}
           onPress={handleClockIn}
-          disabled={clockIn.isPending}
+          disabled={busy}
         />
       </View>
     </Screen>

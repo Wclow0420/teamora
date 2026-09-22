@@ -94,6 +94,22 @@ export default function Payroll() {
               <SubtotalRow label="Gross pay" amount={`RM ${money(num(payslip.basicLabel) + num(payslip.overtimeLabel) + num(payslip.claimsLabel) + num(payslip.bonusLabel))}`} />
             </Card>
 
+            {/* unpaid leave — informational; already reflected in the basic salary above */}
+            {!!payslip.unpaidDays && payslip.unpaidDays > 0 && (
+              <View style={{ flexDirection: 'row', gap: 11, marginTop: 12, padding: 14, borderRadius: radius.lg, backgroundColor: tint.amber }}>
+                <IconTile icon="sun" color={palette.amber} background={palette.white} size={36} iconSize={19} cornerRadius={12} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>
+                    Unpaid leave · {payslip.unpaidDaysLabel ?? `${payslip.unpaidDays} days`}
+                  </Text>
+                  <Text style={[font(500), { fontSize: 11.5, color: palette.soft, marginTop: 4, lineHeight: 16 }]}>
+                    − RM {payslip.unpaidDeductionLabel ?? money(payslip.unpaidDeduction ?? 0)}
+                    {payslip.dailyRateLabel ? ` · RM ${payslip.dailyRateLabel}/day` : ''} — already reflected in basic salary.
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* deductions — tile-less, secondary */}
             <EyebrowRow>Deductions</EyebrowRow>
             <Card padding={0} style={{ borderRadius: radius['2xl'], overflow: 'hidden' }}>

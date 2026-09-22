@@ -59,6 +59,21 @@ public class Employee extends TenantEntity {
     @Column(name = "monthly_salary", precision = 12, scale = 2)
     private BigDecimal monthlySalary;
 
+    // ---- Compensation / schedule overrides (null ⇒ inherit the company default) ----
+
+    /** Pay basis override. Null ⇒ company default. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pay_basis", length = 16)
+    private PayBasis payBasis;
+
+    /** Working-days weekday bitmask override (see {@code WorkWeek}). Null ⇒ company default. */
+    @Column(name = "working_days")
+    private Short workingDays;
+
+    /** Hours-per-day override. Null ⇒ company default. */
+    @Column(name = "hours_per_day", precision = 4, scale = 2)
+    private BigDecimal hoursPerDay;
+
     /** Tax profile (for PCB/MTD). Null marital status → treated as SINGLE. */
     @Enumerated(EnumType.STRING)
     @Column(name = "marital_status", length = 16)
@@ -70,6 +85,32 @@ public class Employee extends TenantEntity {
     @Column(name = "num_children", nullable = false)
     private int numChildren;
 
+    // ---- Statutory & bank identity (for reporting/export; all optional) ----
+
+    /** National Registration Identity Card number (MyKad). */
+    @Column(name = "nric", length = 20)
+    private String nric;
+
+    /** EPF (KWSP) member number. */
+    @Column(name = "epf_no", length = 32)
+    private String epfNo;
+
+    /** SOCSO (PERKESO) number. */
+    @Column(name = "socso_no", length = 32)
+    private String socsoNo;
+
+    /** Income tax reference number (LHDN). */
+    @Column(name = "tax_no", length = 32)
+    private String taxNo;
+
+    /** Bank name for salary payout. */
+    @Column(name = "bank_name", length = 64)
+    private String bankName;
+
+    /** Bank account number for salary payout. */
+    @Column(name = "bank_account_no", length = 40)
+    private String bankAccountNo;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -77,6 +118,11 @@ public class Employee extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporting_manager_id")
     private Employee reportingManager;
+
+    /** Assigned work site for geofenced clock-in (null → no geofence). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_location_id")
+    private com.teamora.location.WorkLocation workLocation;
 
     /** First letter of the name, used for the avatar tile. */
     public String getInitial() {

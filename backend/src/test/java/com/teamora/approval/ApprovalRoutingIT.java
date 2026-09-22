@@ -40,9 +40,10 @@ class ApprovalRoutingIT extends AbstractIntegrationTest {
     }
 
     private String applyLeave(String token) throws Exception {
+        String annual = leaveTypeId(token, "ANNUAL");
         var res = mvc.perform(post("/api/leave/requests").header("Authorization", bearer(token))
                         .contentType("application/json")
-                        .content("{\"leaveType\":\"ANNUAL\",\"startDate\":\"2026-09-10\",\"endDate\":\"2026-09-11\",\"reason\":\"x\"}"))
+                        .content("{\"leaveTypeId\":\"%s\",\"startDate\":\"2026-09-10\",\"endDate\":\"2026-09-11\",\"reason\":\"x\"}".formatted(annual)))
                 .andExpect(status().isOk()).andReturn();
         return om.readTree(res.getResponse().getContentAsString()).get("id").asText();
     }

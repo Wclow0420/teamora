@@ -6,10 +6,12 @@ import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.company.Company;
 import com.teamora.company.CompanyService;
+import com.teamora.company.CompanySettingsService;
 import com.teamora.config.TeamoraProperties;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
 import com.teamora.employee.Role;
+import com.teamora.leave.LeaveTypeService;
 import com.teamora.employee.dto.EmployeeResponse;
 import com.teamora.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,8 @@ public class AuthService {
     private final EmployeeRepository employees;
     private final RefreshTokenRepository refreshTokens;
     private final CompanyService companyService;
+    private final CompanySettingsService companySettingsService;
+    private final LeaveTypeService leaveTypeService;
     private final PasswordEncoder passwordEncoder;
     private final TeamoraProperties props;
 
@@ -42,6 +46,9 @@ public class AuthService {
             throw new BadRequestException("An account with this email already exists");
         }
         Company company = companyService.create(req.companyName());
+        // Every new tenant gets the default payroll settings + leave catalogue.
+        companySettingsService.createDefaults(company);
+        leaveTypeService.seedDefaults(company);
         Employee owner = Employee.builder()
                 .email(req.email().trim())
                 .passwordHash(passwordEncoder.encode(req.password()))

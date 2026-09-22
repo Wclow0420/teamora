@@ -101,10 +101,10 @@ export default function Home() {
   const initial = me.data?.initial ?? '·';
 
   // Today's summary tiles — all real: today's status, annual-leave balance, pending claims.
-  const annual = balances.data?.find((b) => /annual/i.test(b.type) || /annual/i.test(b.label)) ?? balances.data?.[0];
+  const annual = balances.data?.find((b) => /annual/i.test(b.code) || /annual/i.test(b.name)) ?? balances.data?.[0];
   const summary: { icon: IconName; value: string; label: string; color: string; num?: boolean }[] = [
     { icon: 'briefcase', value: attendanceWord(today.data?.status), label: 'Attendance', color: palette.sage },
-    { icon: 'leave', value: annual ? `${annual.remaining}d` : '—', label: annual?.label ?? 'Annual leave', color: palette.coral, num: true },
+    { icon: 'leave', value: annual ? `${annual.remaining}d` : '—', label: annual?.name ?? 'Annual leave', color: palette.coral, num: true },
     { icon: 'receipt', value: claims.data?.pendingTotalLabel ?? '—', label: 'Claims pending', color: palette.amber, num: true },
   ];
 

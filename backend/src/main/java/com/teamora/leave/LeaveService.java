@@ -27,6 +27,7 @@ public class LeaveService {
 
     private final LeaveBalanceRepository balances;
     private final LeaveRequestRepository requests;
+    private final LeaveTypeService leaveTypes;
     private final ApprovalNotifier notifier;
 
     /** The signed-in employee's leave balances (whatever is on record). */
@@ -51,9 +52,11 @@ public class LeaveService {
         }
         int days = inclusiveDays(req);
 
+        LeaveType type = leaveTypes.requireInCompany(employee.getCompany().getId(), req.leaveTypeId());
+
         LeaveRequest entity = LeaveRequest.builder()
                 .employee(employee)
-                .leaveType(req.leaveType())
+                .leaveType(type)
                 .startDate(req.startDate())
                 .endDate(req.endDate())
                 .days(days)
@@ -64,7 +67,7 @@ public class LeaveService {
 
         LeaveRequest saved = requests.save(entity);
         notifier.notifyApprover(employee.getId(), employee.getCompany().getId(), NotificationType.APPROVAL_REQUEST,
-                "New leave request", employee.getFullName() + " requested " + req.leaveType().label() + " (" + days + " day" + (days == 1 ? "" : "s") + ")");
+                "New leave request", employee.getFullName() + " requested " + type.label() + " (" + days + " day" + (days == 1 ? "" : "s") + ")");
         return LeaveRequestResponse.from(saved);
     }
 
@@ -89,7 +92,7 @@ public class LeaveService {
         r.setDecidedBy(admin);
         r.setDecidedAt(Instant.now());
 
-        balances.findByEmployeeIdAndLeaveType(r.getEmployee().getId(), r.getLeaveType())
+        balances.findByEmployeeIdAndLeaveTypeId(r.getEmployee().getId(), r.getLeaveType().getId())
                 .ifPresent(b -> {
                     int used = b.getUsed() == null ? 0 : b.getUsed();
                     b.setUsed(used + (r.getDays() == null ? 0 : r.getDays()));
@@ -135,7 +138,7 @@ public class LeaveService {
     }
 
     private Integer remainingFor(LeaveRequest r) {
-        return balances.findByEmployeeIdAndLeaveType(r.getEmployee().getId(), r.getLeaveType())
+        return balances.findByEmployeeIdAndLeaveTypeId(r.getEmployee().getId(), r.getLeaveType().getId())
                 .map(LeaveBalance::remaining)
                 .orElse(null);
     }

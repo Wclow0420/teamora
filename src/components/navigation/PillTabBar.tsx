@@ -59,6 +59,9 @@ export function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps
             <AnimatedPressable
               key={route.key}
               onPress={onPress}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: focused }}
               layout={morph}
               style={
                 focused

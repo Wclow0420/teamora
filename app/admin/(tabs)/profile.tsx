@@ -25,6 +25,8 @@ export default function AdminProfile() {
 
   const menu: MenuItem[] = [
     { icon: 'building', label: 'Company settings', meta: '', color: palette.coral, bg: tint.coral, href: '/admin/company-settings' },
+    { icon: 'pin', label: 'Work locations', meta: '', color: palette.violet, bg: tint.violet, href: '/admin/work-locations' },
+    { icon: 'calendar', label: 'Company calendar', meta: '', color: palette.amber, bg: tint.amber, href: '/admin/calendar-events' },
     { icon: 'users', label: 'Team members', meta: '', color: palette.sage, bg: tint.sage, href: '/admin/staff' },
     { icon: 'user', label: 'Personal information', meta: '', color: palette.amber, bg: tint.amber },
     { icon: 'gear', label: 'App settings', meta: '', color: palette.soft, bg: tint.neutral },

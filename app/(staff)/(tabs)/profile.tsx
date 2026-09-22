@@ -5,7 +5,7 @@ import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScre
 import { Avatar, Card, Chip, Icon, IconTile, StatTile, type IconName } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { useAuth } from '@/hooks';
-import { useMe, useLeaveBalances } from '@/api/queries';
+import { useMe, useLeaveBalances, usePayslips } from '@/api/queries';
 import { palette, font, radius, tint } from '@/theme';
 
 type MenuItem = { icon: IconName; label: string; meta?: string; color: string; bg: string };
@@ -24,16 +24,22 @@ export default function Profile() {
   const { signOut } = useAuth();
   const me = useMe();
   const balances = useLeaveBalances();
+  const payslips = usePayslips();
 
   const leaveLeft = balances.data
     ? `${balances.data.reduce((sum, b) => sum + b.remaining, 0)} days`
     : '—';
 
+  // Real payslip count (no fake placeholder) — blank until the query resolves.
+  const payslipCount = payslips.data?.length ?? 0;
+  const payslipsMeta = payslips.data ? `${payslipCount} available` : '';
+
   const menu: MenuItem[] = [
     { icon: 'user', label: 'Personal information', meta: '', color: palette.coral, bg: tint.coral },
     { icon: 'briefcase', label: 'Employment details', meta: me.data?.jobTitle ?? '', color: palette.sage, bg: tint.sage },
-    { icon: 'doc', label: 'Documents & contracts', meta: '4 files', color: palette.amber, bg: tint.amber },
-    { icon: 'wallet', label: 'Payslips', meta: '12 available', color: palette.violet, bg: tint.violet },
+    // Documents feature has no backing data yet — no fake count.
+    { icon: 'doc', label: 'Documents & contracts', meta: '', color: palette.amber, bg: tint.amber },
+    { icon: 'wallet', label: 'Payslips', meta: payslipsMeta, color: palette.violet, bg: tint.violet },
     { icon: 'gear', label: 'App settings', meta: '', color: palette.soft, bg: tint.neutral },
     { icon: 'shield', label: 'Privacy & security', meta: '', color: palette.soft, bg: tint.neutral },
   ];

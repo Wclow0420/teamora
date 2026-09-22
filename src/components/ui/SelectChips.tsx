@@ -23,6 +23,9 @@ export function SelectChips<T extends string>({ label, options, value, onChange 
             <Pressable
               key={opt.value}
               onPress={() => onChange(opt.value)}
+              accessibilityRole="radio"
+              accessibilityLabel={opt.label}
+              accessibilityState={{ selected: active }}
               style={{
                 paddingVertical: 9,
                 paddingHorizontal: 14,

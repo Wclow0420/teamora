@@ -6,6 +6,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,5 +41,19 @@ public abstract class AbstractIntegrationTest {
 
     protected String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    /** Resolve a leave-type id by its stable code for the token's company (asserts 200 + a match). */
+    protected String leaveTypeId(String token, String code) throws Exception {
+        var res = mvc.perform(get("/api/leave/types").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode types = om.readTree(res.getResponse().getContentAsString());
+        for (JsonNode t : types) {
+            if (code.equals(t.get("code").asText())) {
+                return t.get("id").asText();
+            }
+        }
+        throw new AssertionError("No leave type with code " + code);
     }
 }

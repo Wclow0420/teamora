@@ -81,4 +81,24 @@ public class Payslip extends TenantEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private PayslipStatus status;
+
+    // ---- Compensation transparency (unpaid-leave deduction, derived rate) ----
+
+    /** Unpaid-leave days deducted from the basic this period. */
+    @Builder.Default
+    @Column(name = "unpaid_days", nullable = false)
+    private int unpaidDays = 0;
+
+    /** Amount deducted for unpaid-leave days (informational; already reflected in {@code basic}). */
+    @Builder.Default
+    @Column(name = "unpaid_deduction", nullable = false, precision = 12, scale = 2)
+    private BigDecimal unpaidDeduction = BigDecimal.ZERO;
+
+    /** Paid days that made up the basic (schedule-driven; null for hourly). */
+    @Column(name = "paid_days")
+    private Integer paidDays;
+
+    /** Derived daily rate for the period (indicative). */
+    @Column(name = "daily_rate", precision = 12, scale = 2)
+    private BigDecimal dailyRate;
 }

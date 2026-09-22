@@ -13,4 +13,8 @@ public interface CompanyEventRepository extends JpaRepository<CompanyEvent, UUID
 
     List<CompanyEvent> findByCompanyIdAndEventDateGreaterThanEqualOrderByEventDateAsc(
             UUID companyId, LocalDate from);
+
+    /** Company holidays (or other event type) within [start, end] — payroll compensation. */
+    List<CompanyEvent> findByCompanyIdAndEventTypeAndEventDateBetween(
+            UUID companyId, EventType eventType, LocalDate start, LocalDate end);
 }

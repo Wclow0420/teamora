@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Modal, Pressable, Image } from 'react-native';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
-import { Avatar, Card, Chip, EmptyState, Icon, LiveDot, Placeholder, StatTile } from '@/components/ui';
+import { Card, Chip, EmptyState, Icon, LiveDot, Placeholder, StatTile } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
+import { SelfieThumb } from '@/components/attendance/SelfieThumb';
 import { useLiveAttendance } from '@/api/queries';
+import { attendanceApi } from '@/api/endpoints';
+import { getAccessToken } from '@/api/tokenStore';
 import { accentFromKey } from '@/api/accents';
 import { palette, font, radius, tint } from '@/theme';
 
@@ -19,6 +22,9 @@ const FILTERS = ['All', 'In office', 'Remote', 'Late'];
 export default function Live() {
   const q = useLiveAttendance();
   const counts = q.data?.counts ?? { inOffice: 0, remote: 0, late: 0, out: 0 };
+  // The selfie the admin is viewing enlarged (null → viewer closed).
+  const [viewer, setViewer] = React.useState<{ recordId: string; name: string } | null>(null);
+  const token = getAccessToken();
 
   const stats: { label: string; value: string; color: string }[] = [
     { label: 'In', value: String(counts.inOffice), color: palette.sage },
@@ -134,7 +140,18 @@ export default function Live() {
                     borderTopColor: palette.line,
                   }}
                 >
-                  <Avatar initial={row.initial} size={38} tint={{ bg: accent.bg, fg: accent.color }} />
+                  <SelfieThumb
+                    recordId={row.attendanceRecordId}
+                    hasPhoto={row.hasPhoto}
+                    initial={row.initial}
+                    tint={{ bg: accent.bg, fg: accent.color }}
+                    size={38}
+                    onPress={
+                      row.hasPhoto && row.attendanceRecordId
+                        ? () => setViewer({ recordId: row.attendanceRecordId as string, name: row.name })
+                        : undefined
+                    }
+                  />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[font(700), { fontSize: 13, color: palette.ink }]} numberOfLines={1}>{row.name}</Text>
                     <Text style={[font(500), { fontSize: 11, color: palette.faint, marginTop: 5 }]} numberOfLines={1}>{row.department}</Text>
@@ -149,6 +166,43 @@ export default function Live() {
           </Card>
         ))}
       </AsyncBoundary>
+
+      {/* enlarged selfie viewer */}
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+        <Pressable
+          onPress={() => setViewer(null)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(28,22,16,0.88)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          {viewer && token && (
+            <>
+              <Image
+                source={{
+                  uri: attendanceApi.photoUrl(viewer.recordId),
+                  headers: { Authorization: `Bearer ${token}` },
+                }}
+                resizeMode="cover"
+                style={{
+                  width: '86%',
+                  aspectRatio: 1,
+                  maxWidth: 360,
+                  borderRadius: radius.hero,
+                  backgroundColor: palette.surfaceSunken,
+                }}
+              />
+              <Text style={[font(700), { fontSize: 15, color: palette.white, marginTop: 16 }]}>{viewer.name}</Text>
+              <Text style={[font(500), { fontSize: 12, color: palette.white, opacity: 0.6, marginTop: 4 }]}>
+                Clock-in photo · tap to close
+              </Text>
+            </>
+          )}
+        </Pressable>
+      </Modal>
     </CollapsingHeaderScreen>
   );
 }

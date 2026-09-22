@@ -31,8 +31,8 @@ public class LeaveRequest extends TenantEntity {
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "leave_type", length = 16, nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "leave_type_id", nullable = false)
     private LeaveType leaveType;
 
     @Column(name = "start_date", nullable = false)

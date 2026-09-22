@@ -22,12 +22,20 @@ public record PayslipResponse(
         String socsoLabel,
         String eisLabel,
         String pcbLabel,
+        int unpaidDays,
+        String unpaidDaysLabel,
+        String unpaidDeductionLabel,
+        String dailyRateLabel,
         String payDateLabel,
         PayslipStatus status,
         String statusLabel,
         String bankLabel
 ) {
     public static PayslipResponse from(Payslip p) {
+        int unpaidDays = p.getUnpaidDays();
+        String unpaidDaysLabel = unpaidDays == 0
+                ? "None"
+                : unpaidDays + (unpaidDays == 1 ? " day" : " days");
         return new PayslipResponse(
                 p.getId(),
                 p.getPeriod(),
@@ -43,6 +51,10 @@ public record PayslipResponse(
                 PayslipFormat.money(p.getSocso()),
                 PayslipFormat.money(p.getEis()),
                 PayslipFormat.money(p.getPcb()),
+                unpaidDays,
+                unpaidDaysLabel,
+                PayslipFormat.money(p.getUnpaidDeduction()),
+                p.getDailyRate() == null ? null : PayslipFormat.money(p.getDailyRate()),
                 PayslipFormat.payDateLabel(p.getPayDate()),
                 p.getStatus(),
                 PayslipFormat.statusLabel(p.getStatus()),

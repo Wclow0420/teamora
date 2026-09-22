@@ -1,0 +1,9 @@
+# Fast local runtime image: copies a jar already built on the host (e.g. by
+# scripts/test-backend.sh's `mvn verify`) into a slim JRE — skips the slow
+# in-Docker Maven build. Dev convenience only; the real image is built by
+# Dockerfile. Rebuild the jar first, then: docker build -f Dockerfile.fast -t backend-api .
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY target/teamora-api-1.0.0.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]

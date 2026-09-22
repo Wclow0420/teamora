@@ -5,18 +5,12 @@ import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { Button, Card, Chip, EmptyState, IconTile, ProgressBar, ScreenHeader } from '@/components/ui';
 import { useLeaveBalances, useLeaveRequests } from '@/api/queries';
-import { statusAccent } from '@/api/accents';
+import { accentFromKey, statusAccent } from '@/api/accents';
 import type { LeaveBalance } from '@/api/types';
 import { palette, font, radius, tint } from '@/theme';
 
-const BALANCE_COLOR: Record<string, string> = {
-  ANNUAL: palette.coral,
-  MEDICAL: palette.sage,
-  EMERGENCY: palette.amber,
-};
-
 function balanceColor(b: LeaveBalance): string {
-  return BALANCE_COLOR[b.type.toUpperCase()] ?? palette.coral;
+  return accentFromKey(b.colorKey).color;
 }
 
 export default function Leave() {
@@ -51,12 +45,12 @@ export default function Leave() {
                 const color = balanceColor(b);
                 const used = b.entitled > 0 ? (b.entitled - b.remaining) / b.entitled : 0;
                 return (
-                  <Card key={b.type} padding={0} elevated={false} style={{ flex: 1, borderRadius: radius.xl, padding: 13, paddingTop: 14 }}>
+                  <Card key={b.leaveTypeId ?? b.code} padding={0} elevated={false} style={{ flex: 1, borderRadius: radius.xl, padding: 13, paddingTop: 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
                       <Text style={[font(800), { fontSize: 24, color }]}>{b.remaining}</Text>
                       <Text style={[font(600), { fontSize: 11, color: palette.faint, marginBottom: 3 }]}>/{b.entitled}</Text>
                     </View>
-                    <Text style={[font(600), { fontSize: 11, color: palette.soft, marginTop: 8 }]}>{b.label}</Text>
+                    <Text style={[font(600), { fontSize: 11, color: palette.soft, marginTop: 8 }]}>{b.name}</Text>
                     <ProgressBar value={used} color={color} />
                   </Card>
                 );

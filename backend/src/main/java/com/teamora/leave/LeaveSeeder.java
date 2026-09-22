@@ -16,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Seeds demo leave balances and requests so the staff Leave screen and the
@@ -31,6 +32,7 @@ public class LeaveSeeder implements CommandLineRunner {
 
     private final LeaveBalanceRepository balances;
     private final LeaveRequestRepository requests;
+    private final LeaveTypeRepository leaveTypes;
     private final EmployeeRepository employees;
     private final TeamoraProperties props;
 
@@ -51,41 +53,50 @@ public class LeaveSeeder implements CommandLineRunner {
         // The HR manager is the decision-maker for already-decided requests.
         Employee approver = employees.findByEmailIgnoreCase("sarah@lumi.com").orElse(amir.get());
 
+        UUID lumiId = amir.get().getCompany().getId();
+        LeaveType annual = type(lumiId, "ANNUAL");
+        LeaveType medical = type(lumiId, "MEDICAL");
+        LeaveType emergency = type(lumiId, "EMERGENCY");
+
         List<LeaveBalance> seededBalances = new ArrayList<>();
         if (balances.count() == 0) {
-            seededBalances.add(balance(amir.get(), LeaveType.ANNUAL, 16, 4));
-            seededBalances.add(balance(amir.get(), LeaveType.MEDICAL, 14, 6));
-            seededBalances.add(balance(amir.get(), LeaveType.EMERGENCY, 5, 2));
+            seededBalances.add(balance(amir.get(), annual, 16, 4));
+            seededBalances.add(balance(amir.get(), medical, 14, 6));
+            seededBalances.add(balance(amir.get(), emergency, 5, 2));
             balances.saveAll(seededBalances);
         }
 
         List<LeaveRequest> reqs = new ArrayList<>();
 
-        // Amir's own history (Leave screen).
-        reqs.add(decided(amir.get(), LeaveType.ANNUAL,
+        // Amir's own history (Leave screen). All PAID types so payroll stays unchanged.
+        reqs.add(decided(amir.get(), annual,
                 LocalDate.of(2026, 6, 18), LocalDate.of(2026, 6, 19),
                 "Family trip", LeaveStatus.APPROVED, approver));
-        reqs.add(decided(amir.get(), LeaveType.MEDICAL,
+        reqs.add(decided(amir.get(), medical,
                 LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10),
                 "Fever", LeaveStatus.APPROVED, approver));
-        reqs.add(pending(amir.get(), LeaveType.EMERGENCY,
+        reqs.add(pending(amir.get(), emergency,
                 LocalDate.of(2026, 6, 22), LocalDate.of(2026, 6, 22),
                 "Family emergency"));
-        // "Unpaid" maps to ANNUAL since the schema only has 3 types; rejected.
-        reqs.add(decided(amir.get(), LeaveType.ANNUAL,
+        reqs.add(decided(amir.get(), annual,
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1),
-                "Unpaid leave", LeaveStatus.REJECTED, approver));
+                "Extra day off", LeaveStatus.REJECTED, approver));
 
         // Pending requests from others (admin Approvals screen).
-        faizal.ifPresent(f -> reqs.add(pending(f, LeaveType.MEDICAL,
+        faizal.ifPresent(f -> reqs.add(pending(f, type(f.getCompany().getId(), "MEDICAL"),
                 LocalDate.of(2026, 6, 16), LocalDate.of(2026, 6, 16),
                 "Clinic appointment")));
-        nadia.ifPresent(n -> reqs.add(pending(n, LeaveType.ANNUAL,
+        nadia.ifPresent(n -> reqs.add(pending(n, type(n.getCompany().getId(), "ANNUAL"),
                 LocalDate.of(2026, 6, 23), LocalDate.of(2026, 6, 25),
                 "Short holiday")));
 
         requests.saveAll(reqs);
         log.info("Seeded {} leave balances and {} leave requests", seededBalances.size(), reqs.size());
+    }
+
+    private LeaveType type(UUID companyId, String code) {
+        return leaveTypes.findByCompanyIdAndCode(companyId, code)
+                .orElseThrow(() -> new IllegalStateException("Missing seeded leave type " + code + " for company " + companyId));
     }
 
     private LeaveBalance balance(Employee e, LeaveType type, int entitled, int used) {

@@ -91,6 +91,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundleIdentifier,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // Foreground location — used to verify staff are on-site at clock-in.
+        NSLocationWhenInUseUsageDescription:
+          "Teamora uses your location to verify you're at your work site when you clock in.",
+        // Front camera — used to take the clock-in selfie (attendance proof).
+        NSCameraUsageDescription: 'Teamora uses the camera to take your clock-in photo.',
       },
     },
 
@@ -99,6 +104,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       adaptiveIcon: {
         backgroundColor: BRAND_BG,
       },
+      permissions: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'CAMERA'],
     },
 
     // Native only. Teamora ships to iOS + Android (internal/TestFlight builds
@@ -113,6 +119,24 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-secure-store',
       '@react-native-community/datetimepicker',
       'expo-notifications',
+      [
+        'expo-location',
+        {
+          // Foreground-only geofence check at clock-in — no background location.
+          locationWhenInUsePermission:
+            "Teamora uses your location to verify you're at your work site when you clock in.",
+          isAndroidBackgroundLocationEnabled: false,
+          isAndroidForegroundServiceEnabled: false,
+        },
+      ],
+      [
+        'expo-camera',
+        {
+          // Front-camera clock-in selfie (attendance proof) — foreground only.
+          cameraPermission: 'Teamora uses the camera to take your clock-in photo.',
+          recordAudioAndroid: false,
+        },
+      ],
     ],
 
     experiments: {

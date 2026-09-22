@@ -27,6 +27,8 @@ export function ScreenHeader({ title, subtitle, back, badge, action, onAction, l
       {back && (
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : null)}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
             width: 40,
             height: 40,
@@ -58,7 +60,7 @@ export function ScreenHeader({ title, subtitle, back, badge, action, onAction, l
         )}
       </View>
       {action ? (
-        <Pressable onPress={onAction}>
+        <Pressable onPress={onAction} accessibilityRole="button" accessibilityLabel={action}>
           <Text style={[font(600), { fontSize: 12.5, color: palette.coral }]}>{action}</Text>
         </Pressable>
       ) : (

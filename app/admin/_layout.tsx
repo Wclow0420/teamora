@@ -17,6 +17,12 @@ export default function AdminLayout() {
       <Stack.Screen name="shift-assign" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="employee-edit" />
       <Stack.Screen name="company-settings" />
+      <Stack.Screen name="payroll-export" />
+      <Stack.Screen name="leave-type-edit" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="work-locations" />
+      <Stack.Screen name="work-location-edit" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="calendar-events" />
+      <Stack.Screen name="calendar-event-edit" options={{ animation: 'slide_from_bottom' }} />
     </Stack>
   );
 }

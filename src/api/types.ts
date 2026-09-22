@@ -5,6 +5,96 @@ export type Role = 'OWNER' | 'HR_ADMIN' | 'MANAGER' | 'EMPLOYEE';
 /** Marital status — drives the PCB (income tax) estimate. */
 export type MaritalStatus = 'SINGLE' | 'MARRIED';
 
+/**
+ * How a staff member is paid. Monthly salary is always the stored input; the
+ * daily/hourly rates derive from it (see the compensation engine). Company sets
+ * a default; each employee may override.
+ */
+export type PayBasis = 'MONTHLY' | 'DAILY' | 'HOURLY';
+
+/** How a leave type's entitlement accrues. */
+export type LeaveAccrual = 'FIXED_ANNUAL' | 'MONTHLY_ACCRUAL' | 'NONE';
+
+/**
+ * A company-configurable leave type (replaces the old hardcoded enum). `paid`
+ * decides whether the leave deducts salary; `colorKey` maps to a theme accent.
+ */
+export type LeaveTypeDef = {
+  id: string;
+  name: string;
+  code: string;
+  paid: boolean;
+  defaultEntitlementDays: number;
+  accrual: LeaveAccrual;
+  colorKey: string;
+  active: boolean;
+  sortOrder: number;
+};
+
+/** Company-wide compensation/schedule defaults applied to new staff. */
+export type CompanySettings = {
+  defaultPayBasis: PayBasis;
+  /** Working-weekday bitmask: bit0=Mon … bit6=Sun. Mon–Fri = 31, full week = 127. */
+  defaultWorkingDays: number;
+  defaultHoursPerDay: number;
+};
+export type UpdateCompanySettingsBody = {
+  defaultPayBasis?: PayBasis;
+  defaultWorkingDays?: number;
+  defaultHoursPerDay?: number;
+};
+
+export type CreateLeaveTypeBody = {
+  name: string;
+  code: string;
+  paid: boolean;
+  defaultEntitlementDays: number;
+  accrual?: LeaveAccrual;
+  colorKey: string;
+  sortOrder?: number;
+};
+export type UpdateLeaveTypeBody = {
+  name?: string;
+  paid?: boolean;
+  defaultEntitlementDays?: number;
+  accrual?: LeaveAccrual;
+  colorKey?: string;
+  active?: boolean;
+  sortOrder?: number;
+};
+
+// ---- Work locations (geofencing) ----
+/** A company work site: a GPS pin + a radius staff must be within to clock in. */
+export type WorkLocation = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusM: number;
+  active: boolean;
+};
+export type CreateWorkLocationBody = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusM?: number;
+  active?: boolean;
+};
+export type UpdateWorkLocationBody = {
+  name?: string;
+  latitude?: number;
+  longitude?: number;
+  radiusM?: number;
+  active?: boolean;
+};
+
+/**
+ * Sent with a clock-in: coordinates for the server-side geofence check, plus an
+ * optional front-camera selfie (bare base64 JPEG) as attendance proof. The photo
+ * is optional/non-blocking — clock-in still succeeds without it.
+ */
+export type ClockInBody = { latitude?: number; longitude?: number; photoBase64?: string };
+
 /** Not an EMPLOYEE — can be a reporting manager / approver. */
 export function isManagementRole(role: Role | null | undefined): boolean {
   return role != null && role !== 'EMPLOYEE';
@@ -35,10 +125,29 @@ export type EmployeeResponse = {
   companyName: string | null;
   reportingManagerId: string | null;
   reportingManagerName: string | null;
+  /** Assigned work site for geofenced clock-in (null → no geofence). */
+  workLocationId: string | null;
+  workLocationName: string | null;
   monthlySalary: number | null;
   maritalStatus: MaritalStatus | null;
   spouseWorking: boolean | null;
   numChildren: number;
+  /** Statutory & bank identity — needed for payroll/statutory exports. All nullable. */
+  nric: string | null;
+  epfNo: string | null;
+  socsoNo: string | null;
+  taxNo: string | null;
+  bankName: string | null;
+  bankAccountNo: string | null;
+  /** Effective pay basis (own override else company default). */
+  payBasis: PayBasis;
+  /** Effective working-weekday bitmask (own override else company default). */
+  workingDays: number;
+  /** Effective hours worked per scheduled day. */
+  hoursPerDay: number;
+  /** Indicative derived rates for the CURRENT month (null when no salary set). */
+  derivedDailyRate: number | null;
+  derivedHourlyRate: number | null;
 };
 
 export type ManagerOption = { id: string; fullName: string; role: Role; jobTitle: string | null };
@@ -87,6 +196,10 @@ export type LiveStaffRow = {
   status: string;
   time: string;
   accentColorKey: string;
+  /** Today's attendance record id — used to build the clock-in photo URL. */
+  attendanceRecordId?: string | null;
+  /** Whether a clock-in selfie is stored for today's record. */
+  hasPhoto?: boolean;
 };
 export type LiveAttendance = {
   counts: { inOffice: number; remote: number; late: number; out: number };
@@ -94,11 +207,24 @@ export type LiveAttendance = {
 };
 
 // ---- Leave ----
-export type LeaveBalance = { type: string; label: string; used: number; entitled: number; remaining: number };
+export type LeaveBalance = {
+  /** FK to the configurable leave type + its display metadata. */
+  leaveTypeId: string;
+  code: string;
+  name: string;
+  colorKey: string;
+  paid: boolean;
+  used: number;
+  entitled: number;
+  remaining: number;
+};
 export type LeaveRequest = {
   id: string;
-  type: string;
+  leaveTypeId: string;
+  typeCode: string;
   typeLabel: string;
+  colorKey: string;
+  paid: boolean;
   dateRangeLabel: string;
   durationLabel: string;
   reason: string | null;
@@ -109,15 +235,17 @@ export type PendingLeave = {
   id: string;
   employeeName: string;
   initial: string;
-  type: string;
+  leaveTypeId: string;
+  typeCode: string;
   typeLabel: string;
+  paid: boolean;
   dateRangeLabel: string;
   durationLabel: string;
   reason: string | null;
   balanceLabel: string;
   accentColorKey: string;
 };
-export type ApplyLeaveBody = { leaveType: string; startDate: string; endDate: string; reason?: string };
+export type ApplyLeaveBody = { leaveTypeId: string; startDate: string; endDate: string; reason?: string };
 
 // ---- Claims ----
 export type Claim = {
@@ -183,6 +311,16 @@ export type Payslip = {
   status: string;
   statusLabel: string;
   bankLabel: string;
+  /**
+   * Unpaid-leave transparency (present once the comp/leave engine ships). `basic`
+   * is the paid basic (already net of any unpaid deduction); these fields explain
+   * the reduction. Optional so pre-engine payslips still parse.
+   */
+  unpaidDays?: number;
+  unpaidDeduction?: number;
+  unpaidDaysLabel?: string;
+  unpaidDeductionLabel?: string;
+  dailyRateLabel?: string;
 };
 export type PayrollSummary = {
   period: string;
@@ -217,6 +355,9 @@ export type PayrollRunLine = {
   deductionsLabel: string;
   netLabel: string;
   status: PayslipStatus;
+  /** Unpaid-leave transparency (present once the comp/leave engine ships). */
+  unpaidDaysLabel?: string;
+  unpaidDeductionLabel?: string;
 };
 
 export type PayrollRun = {
@@ -273,10 +414,22 @@ export type CreateEmployeeBody = {
   staffId?: string;
   phone?: string;
   reportingManagerId?: string;
+  /** Assign a work site, or `null` to clear (no geofence). */
+  workLocationId?: string | null;
   monthlySalary?: number;
   maritalStatus?: MaritalStatus;
   spouseWorking?: boolean;
   numChildren?: number;
+  payBasis?: PayBasis;
+  workingDays?: number;
+  hoursPerDay?: number;
+  /** Statutory & bank identity (all optional). */
+  nric?: string;
+  epfNo?: string;
+  socsoNo?: string;
+  taxNo?: string;
+  bankName?: string;
+  bankAccountNo?: string;
 };
 export type ChangeRoleBody = { role: Role };
 export type UpdateEmployeeBody = {
@@ -287,15 +440,108 @@ export type UpdateEmployeeBody = {
   staffId?: string;
   role?: Role;
   reportingManagerId?: string;
+  /** Assign a work site, or `null` to clear (no geofence). */
+  workLocationId?: string | null;
   monthlySalary?: number;
   maritalStatus?: MaritalStatus;
   spouseWorking?: boolean;
   numChildren?: number;
+  payBasis?: PayBasis;
+  workingDays?: number;
+  hoursPerDay?: number;
+  /** Statutory & bank identity (all optional). */
+  nric?: string;
+  epfNo?: string;
+  socsoNo?: string;
+  taxNo?: string;
+  bankName?: string;
+  bankAccountNo?: string;
 };
+
+// ---- Payroll statutory export ----
+/**
+ * One employee's statutory contribution line for a payroll period. Every money
+ * value is a pre-formatted label from the backend (matching the app's label
+ * convention); render with tabular-nums.
+ */
+export type StatutorySummaryRow = {
+  employeeName: string;
+  staffId: string | null;
+  nric: string | null;
+  epfNo: string | null;
+  epfEmployeeLabel: string;
+  epfEmployerLabel: string;
+  socsoNo: string | null;
+  socsoEmployeeLabel: string;
+  socsoEmployerLabel: string;
+  eisEmployeeLabel: string;
+  eisEmployerLabel: string;
+  taxNo: string | null;
+  pcbLabel: string;
+  netLabel: string;
+};
+
+/** Company totals row — same money label fields as a row, summed. */
+export type StatutorySummaryTotals = {
+  epfEmployeeLabel: string;
+  epfEmployerLabel: string;
+  socsoEmployeeLabel: string;
+  socsoEmployerLabel: string;
+  eisEmployeeLabel: string;
+  eisEmployerLabel: string;
+  pcbLabel: string;
+  netLabel: string;
+};
+
+/** On-screen statutory contribution summary for a period (persisted payslips). */
+export type StatutorySummary = {
+  period: string;
+  generatedAtLabel: string;
+  rows: StatutorySummaryRow[];
+  totals: StatutorySummaryTotals;
+};
+
+/** The export file types the backend can generate for a period. */
+export type ExportType = 'contributions' | 'bank' | 'payroll' | 'cp39';
+
+/** A downloadable export payload (CSV / plain text) returned by the backend. */
+export type ExportFile = { filename: string; mimeType: string; content: string };
 
 // ---- Calendar ----
 export type UpcomingEvent = { iconName: string; title: string; dateLabel: string; accentColorKey: string };
 export type MonthCalendar = { monthLabel: string; events: Record<string, string[]>; upcoming: UpcomingEvent[] };
+
+/**
+ * Company event types an admin can author. `BIRTHDAY` exists on the backend but
+ * is derived from employee records, so it is never hand-created here.
+ */
+export type EventTypeValue = 'HOLIDAY' | 'EVENT' | 'TOWNHALL';
+
+/** A single company calendar entry (admin CRUD view). */
+export type CompanyEventItem = {
+  id: string;
+  title: string;
+  /** ISO date (YYYY-MM-DD). */
+  eventDate: string;
+  eventType: EventTypeValue;
+  accentColorKey: string;
+  iconName: string;
+  timeLabel: string | null;
+};
+
+export type CreateCompanyEventBody = {
+  title: string;
+  eventDate: string;
+  eventType: EventTypeValue;
+  timeLabel?: string | null;
+};
+
+export type UpdateCompanyEventBody = {
+  title?: string;
+  eventDate?: string;
+  eventType?: EventTypeValue;
+  timeLabel?: string | null;
+};
 
 // ---- Notifications ----
 export type NotificationItem = {

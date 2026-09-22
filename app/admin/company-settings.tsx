@@ -1,22 +1,74 @@
-import React, { useState } from 'react';
-import { View, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
-import { ScreenHeader, Button, TextField } from '@/components/ui';
+import {
+  ScreenHeader,
+  Button,
+  TextField,
+  SelectChips,
+  WeekdayToggles,
+  SectionLabel,
+  Card,
+  Chip,
+  Icon,
+  IconTile,
+  type SelectOption,
+} from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { useCompany, useUpdateCompany } from '@/api/queries';
+import {
+  useAdminLeaveTypes,
+  useCompany,
+  useCompanySettings,
+  useUpdateCompany,
+  useUpdateCompanySettings,
+} from '@/api/queries';
+import { accentFromKey } from '@/api/accents';
 import { ApiError } from '@/api/client';
-import type { CompanyResponse } from '@/api/types';
-import { palette } from '@/theme';
+import type { CompanyResponse, CompanySettings, LeaveTypeDef, PayBasis } from '@/api/types';
+import { describeMask } from '@/lib/workweek';
+import { palette, font, radius, tint } from '@/theme';
+
+const PAY_BASIS_OPTIONS: SelectOption<PayBasis>[] = [
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'DAILY', label: 'Daily' },
+  { value: 'HOURLY', label: 'Hourly' },
+];
 
 export default function CompanySettings() {
-  const q = useCompany();
+  const company = useCompany();
+  const settings = useCompanySettings();
+  const leaveTypes = useAdminLeaveTypes();
 
   return (
     <Screen>
       <ScreenHeader back title="Company settings" />
-      <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
-        {q.data && <CompanyForm company={q.data} />}
+
+      <View style={{ marginTop: 4 }}>
+        <SectionLabel title="Company profile" />
+      </View>
+      <AsyncBoundary loading={company.isLoading} error={company.error} onRetry={company.refetch}>
+        {company.data && <CompanyForm company={company.data} />}
+      </AsyncBoundary>
+
+      <View style={{ marginTop: 24 }}>
+        <SectionLabel title="Payroll defaults" />
+      </View>
+      <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginBottom: 12, lineHeight: 16 }]}>
+        Applied to new staff. Each employee can override these on their profile.
+      </Text>
+      <AsyncBoundary loading={settings.isLoading} error={settings.error} onRetry={settings.refetch}>
+        {settings.data && <PayrollDefaultsForm settings={settings.data} />}
+      </AsyncBoundary>
+
+      <View style={{ marginTop: 24 }}>
+        <SectionLabel title="Leave types" />
+      </View>
+      <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginBottom: 12, lineHeight: 16 }]}>
+        Configure the leave types staff can apply for. Unpaid types deduct salary.
+      </Text>
+      <AsyncBoundary loading={leaveTypes.isLoading} error={leaveTypes.error} onRetry={leaveTypes.refetch}>
+        {leaveTypes.data && <LeaveTypesManager types={leaveTypes.data} />}
       </AsyncBoundary>
     </Screen>
   );
@@ -65,6 +117,131 @@ function CompanyForm({ company }: { company: CompanyResponse }) {
       {error && <Text style={{ color: palette.danger, fontSize: 12.5 }}>{error}</Text>}
 
       <Button label={update.isPending ? 'Saving…' : 'Save changes'} onPress={onSubmit} disabled={update.isPending} />
+    </View>
+  );
+}
+
+function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
+  const update = useUpdateCompanySettings();
+
+  const [payBasis, setPayBasis] = useState<PayBasis>(settings.defaultPayBasis);
+  const [workingDays, setWorkingDays] = useState<number>(settings.defaultWorkingDays);
+  const [hoursPerDay, setHoursPerDay] = useState(String(settings.defaultHoursPerDay));
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const onSave = async () => {
+    setError(null);
+    setSaved(false);
+    const hours = Number(hoursPerDay);
+    if (!Number.isFinite(hours) || hours <= 0) {
+      setError('Enter valid hours per day.');
+      return;
+    }
+    try {
+      await update.mutateAsync({
+        defaultPayBasis: payBasis,
+        defaultWorkingDays: workingDays,
+        defaultHoursPerDay: hours,
+      });
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
+    }
+  };
+
+  return (
+    <View style={{ gap: 14 }}>
+      <SelectChips label="Default pay basis" options={PAY_BASIS_OPTIONS} value={payBasis} onChange={setPayBasis} />
+      <WeekdayToggles label="Default working days" value={workingDays} onChange={setWorkingDays} />
+      <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8 }]}>{describeMask(workingDays)}</Text>
+      <TextField
+        label="Default hours per day"
+        value={hoursPerDay}
+        onChangeText={setHoursPerDay}
+        keyboardType="decimal-pad"
+        placeholder="e.g. 8"
+      />
+
+      {error && <Text style={{ color: palette.danger, fontSize: 12.5 }}>{error}</Text>}
+      {saved && !error && <Text style={{ color: palette.sage, fontSize: 12.5 }}>Payroll defaults saved.</Text>}
+
+      <Button
+        label={update.isPending ? 'Saving…' : 'Save defaults'}
+        onPress={onSave}
+        disabled={update.isPending}
+      />
+    </View>
+  );
+}
+
+function LeaveTypesManager({ types }: { types: LeaveTypeDef[] }) {
+  const router = useRouter();
+
+  const openEdit = (t: LeaveTypeDef) =>
+    router.push({
+      pathname: '/admin/leave-type-edit',
+      params: {
+        id: t.id,
+        name: t.name,
+        code: t.code,
+        paid: String(t.paid),
+        defaultEntitlementDays: String(t.defaultEntitlementDays),
+        accrual: t.accrual,
+        colorKey: t.colorKey,
+        active: String(t.active),
+      },
+    });
+
+  return (
+    <View style={{ gap: 10 }}>
+      {types.length > 0 && (
+        <Card padding={0} style={{ borderRadius: radius['2xl'], overflow: 'hidden' }}>
+          {types.map((t, i) => {
+            const accent = accentFromKey(t.colorKey);
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => openEdit(t)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 13,
+                  paddingVertical: 13,
+                  paddingHorizontal: 15,
+                  borderTopWidth: i ? 1 : 0,
+                  borderTopColor: palette.line,
+                  opacity: t.active ? 1 : 0.55,
+                }}
+              >
+                <IconTile icon="sun" color={accent.color} background={accent.bg} size={38} iconSize={19} cornerRadius={12} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[font(700), { fontSize: 13.5, color: palette.ink }]} numberOfLines={1}>
+                    {t.name}
+                  </Text>
+                  <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 4 }]}>
+                    {t.defaultEntitlementDays} days/yr{t.active ? '' : ' · hidden'}
+                  </Text>
+                </View>
+                <Chip
+                  label={t.paid ? 'Paid' : 'Unpaid'}
+                  size="sm"
+                  color={t.paid ? palette.sage : palette.amber}
+                  background={t.paid ? tint.sage : tint.amber}
+                />
+                <Icon name="chevR" size={16} color={palette.faint} />
+              </Pressable>
+            );
+          })}
+        </Card>
+      )}
+
+      <Button
+        label="Add leave type"
+        icon="plus"
+        variant="light"
+        onPress={() => router.push('/admin/leave-type-edit')}
+      />
     </View>
   );
 }

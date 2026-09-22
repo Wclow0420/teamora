@@ -8,12 +8,16 @@ import com.teamora.employee.dto.EmployeeDtos.CreateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
+import com.teamora.location.WorkLocation;
+import com.teamora.location.WorkLocationRepository;
+import com.teamora.payroll.CompensationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +28,8 @@ public class EmployeeService {
 
     private final EmployeeRepository employees;
     private final PasswordEncoder passwordEncoder;
+    private final CompensationService compensationService;
+    private final WorkLocationRepository workLocations;
 
     /** Directory listing — scoped to the caller's company. */
     public List<EmployeeResponse> search(UUID companyId, String department, String query) {
@@ -34,8 +40,19 @@ public class EmployeeService {
 
     public EmployeeResponse get(UUID companyId, UUID id) {
         return employees.findByIdAndCompanyIdWithManager(id, companyId)
-                .map(EmployeeResponse::withManager)
+                .map(this::toDetail)
                 .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
+    }
+
+    /** Adds the effective schedule + indicative derived daily/hourly rates for the current month. */
+    private EmployeeResponse toDetail(Employee e) {
+        CompensationService.Derivation d = compensationService.derive(e, YearMonth.now());
+        return EmployeeResponse.withComp(e,
+                d.schedule().payBasis(),
+                d.schedule().workingDaysMask(),
+                d.schedule().hoursPerDay(),
+                d.dailyRate(),
+                d.hourlyRate());
     }
 
     public long activeHeadcount(UUID companyId) {
@@ -68,12 +85,22 @@ public class EmployeeService {
                 .maritalStatus(req.maritalStatus())
                 .spouseWorking(req.spouseWorking())
                 .numChildren(req.numChildren() != null ? req.numChildren() : 0)
+                .payBasis(req.payBasis())
+                .workingDays(req.workingDays() != null ? req.workingDays().shortValue() : null)
+                .hoursPerDay(req.hoursPerDay())
+                .nric(trimToNull(req.nric()))
+                .epfNo(trimToNull(req.epfNo()))
+                .socsoNo(trimToNull(req.socsoNo()))
+                .taxNo(trimToNull(req.taxNo()))
+                .bankName(trimToNull(req.bankName()))
+                .bankAccountNo(trimToNull(req.bankAccountNo()))
                 .location(company.getName())
                 .active(true)
                 .build();
         e.setCompany(company);
         e.setReportingManager(resolveReportingManager(company.getId(), req.reportingManagerId(), null));
-        return EmployeeResponse.withManager(employees.save(e));
+        e.setWorkLocation(resolveWorkLocation(company.getId(), req.workLocationId()));
+        return toDetail(employees.save(e));
     }
 
     @Transactional
@@ -104,7 +131,17 @@ public class EmployeeService {
         if (req.maritalStatus() != null) e.setMaritalStatus(req.maritalStatus());
         if (req.spouseWorking() != null) e.setSpouseWorking(req.spouseWorking());
         if (req.numChildren() != null) e.setNumChildren(req.numChildren());
+        if (req.payBasis() != null) e.setPayBasis(req.payBasis());
+        if (req.workingDays() != null) e.setWorkingDays(req.workingDays().shortValue());
+        if (req.hoursPerDay() != null) e.setHoursPerDay(req.hoursPerDay());
+        if (req.nric() != null) e.setNric(trimToNull(req.nric()));
+        if (req.epfNo() != null) e.setEpfNo(trimToNull(req.epfNo()));
+        if (req.socsoNo() != null) e.setSocsoNo(trimToNull(req.socsoNo()));
+        if (req.taxNo() != null) e.setTaxNo(trimToNull(req.taxNo()));
+        if (req.bankName() != null) e.setBankName(trimToNull(req.bankName()));
+        if (req.bankAccountNo() != null) e.setBankAccountNo(trimToNull(req.bankAccountNo()));
         e.setReportingManager(resolveReportingManager(companyId, req.reportingManagerId(), e.getId()));
+        e.setWorkLocation(resolveWorkLocation(companyId, req.workLocationId()));
 
         if (req.role() != null && req.role() != e.getRole()) {
             rejectOwnerRole(req.role());
@@ -116,7 +153,7 @@ public class EmployeeService {
             }
             e.setRole(req.role());
         }
-        return EmployeeResponse.withManager(e);
+        return toDetail(e);
     }
 
     /**
@@ -150,6 +187,13 @@ public class EmployeeService {
 
     // ---- helpers ----
 
+    /** Trim a nullable string, mapping blank → null (so optional identity fields don't store empty strings). */
+    private static String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
     private void rejectOwnerRole(Role role) {
         if (role == Role.OWNER) {
             throw new BadRequestException("OWNER can't be assigned here — use transfer ownership");
@@ -167,5 +211,12 @@ public class EmployeeService {
             throw new BadRequestException("Reporting manager must be a manager, HR admin or owner");
         }
         return mgr;
+    }
+
+    /** Resolve an assigned work location within the company; null id clears the assignment. */
+    private WorkLocation resolveWorkLocation(UUID companyId, UUID workLocationId) {
+        if (workLocationId == null) return null;
+        return workLocations.findByIdAndCompanyId(workLocationId, companyId)
+                .orElseThrow(() -> new BadRequestException("Work location not found in your company"));
     }
 }

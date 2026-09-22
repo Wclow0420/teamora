@@ -63,7 +63,14 @@ export function Button({
   };
 
   return (
-    <Pressable onPress={handlePress} disabled={disabled} style={block ? { width: '100%' } : undefined}>
+    <Pressable
+      onPress={handlePress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      style={block ? { width: '100%' } : undefined}
+    >
       {({ pressed }) => (
         <View
           style={[

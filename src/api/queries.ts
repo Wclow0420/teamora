@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { attendanceApi, calendarApi, claimApi, companyApi, dashboardApi, employeeApi, leaveApi, notificationApi, overtimeApi, payrollApi, scheduleApi } from './endpoints';
-import type { ApplyLeaveBody, AssignShiftBody, CreateEmployeeBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateEmployeeBody } from './types';
+import { attendanceApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
+import type { ApplyLeaveBody, AssignShiftBody, ClockInBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateWorkLocationBody } from './types';
 
 /** Centralised query keys. */
 export const qk = {
@@ -17,8 +17,15 @@ export const qk = {
   payslip: (period: string) => ['payroll', 'payslip', period] as const,
   payrollSummary: (period?: string) => ['payroll', 'summary', period ?? 'latest'] as const,
   payrollRun: (period: string) => ['payroll', 'run', period] as const,
+  payrollExportSummary: (period: string) => ['payroll', 'export', 'summary', period] as const,
   staff: (dept?: string, q?: string) => ['employees', dept ?? 'all', q ?? ''] as const,
   company: ['company', 'me'] as const,
+  companySettings: ['companySettings'] as const,
+  leaveTypes: ['leaveTypes', 'active'] as const,
+  adminLeaveTypes: ['leaveTypes', 'all'] as const,
+  workLocations: ['workLocations', 'active'] as const,
+  adminWorkLocations: ['workLocations', 'all'] as const,
+  adminCalendar: (month?: string) => ['adminCalendar', month ?? 'current'] as const,
 };
 
 // ---- Profile ----
@@ -34,7 +41,7 @@ export const useLiveAttendance = () =>
 export function useClockIn() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: attendanceApi.clockIn,
+    mutationFn: (body?: ClockInBody) => attendanceApi.clockIn(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['attendance'] });
     },
@@ -54,6 +61,57 @@ export function useClockOut() {
 export const useLeaveBalances = () => useQuery({ queryKey: qk.leaveBalances, queryFn: leaveApi.balances });
 export const useLeaveRequests = () => useQuery({ queryKey: qk.leaveRequests, queryFn: leaveApi.requests });
 export const usePendingLeave = () => useQuery({ queryKey: qk.pendingLeave, queryFn: leaveApi.pending });
+
+// ---- Leave types (config) ----
+/** Active leave types for staff pickers. */
+export const useLeaveTypes = () => useQuery({ queryKey: qk.leaveTypes, queryFn: leaveTypeApi.active });
+/** All leave types (incl. inactive) for admin management. */
+export const useAdminLeaveTypes = () => useQuery({ queryKey: qk.adminLeaveTypes, queryFn: leaveTypeApi.all });
+
+export function useCreateLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateLeaveTypeBody) => leaveTypeApi.create(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leaveTypes'] });
+      qc.invalidateQueries({ queryKey: ['leave'] });
+    },
+  });
+}
+export function useUpdateLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateLeaveTypeBody }) => leaveTypeApi.update(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leaveTypes'] });
+      qc.invalidateQueries({ queryKey: ['leave'] });
+    },
+  });
+}
+
+// ---- Work locations (geofencing) ----
+/** Active work sites for staff pickers / clock-in. */
+export const useWorkLocations = () =>
+  useQuery({ queryKey: qk.workLocations, queryFn: workLocationApi.list });
+/** All work sites (incl. inactive) for admin management. */
+export const useAdminWorkLocations = () =>
+  useQuery({ queryKey: qk.adminWorkLocations, queryFn: workLocationApi.adminList });
+
+export function useCreateWorkLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateWorkLocationBody) => workLocationApi.create(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workLocations'] }),
+  });
+}
+export function useUpdateWorkLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateWorkLocationBody }) =>
+      workLocationApi.update(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workLocations'] }),
+  });
+}
 
 export function useApplyLeave() {
   const qc = useQueryClient();
@@ -146,9 +204,54 @@ export function useMarkPayrollPaid() {
   return useMutation({ mutationFn: (period: string) => payrollApi.markPaid(period), onSuccess: invalidate });
 }
 
+// ---- Payroll statutory export ----
+/** On-screen statutory contribution summary for a period (enabled once a period is set). */
+export const usePayrollExportSummary = (period: string) =>
+  useQuery({
+    queryKey: qk.payrollExportSummary(period),
+    queryFn: () => payrollExportApi.summary(period),
+    enabled: !!period,
+  });
+
 // ---- Calendar ----
 export const useCalendar = (month?: string) =>
   useQuery({ queryKey: ['calendar', month ?? 'current'], queryFn: () => calendarApi.month(month) });
+
+// ---- Company calendar (admin CRUD) ----
+/** All company events in `month` (YYYY-MM); omit for the current month. */
+export const useAdminCalendarEvents = (month?: string) =>
+  useQuery({ queryKey: qk.adminCalendar(month), queryFn: () => calendarAdminApi.list(month) });
+
+/**
+ * Both the admin list and the staff calendar are invalidated on every mutation —
+ * a new holiday must show up on employees' calendars immediately.
+ */
+function invalidateCalendars(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['adminCalendar'] });
+  qc.invalidateQueries({ queryKey: ['calendar'] });
+}
+
+export function useCreateCompanyEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateCompanyEventBody) => calendarAdminApi.create(body),
+    onSuccess: () => invalidateCalendars(qc),
+  });
+}
+export function useUpdateCompanyEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateCompanyEventBody }) => calendarAdminApi.update(id, body),
+    onSuccess: () => invalidateCalendars(qc),
+  });
+}
+export function useDeleteCompanyEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => calendarAdminApi.remove(id),
+    onSuccess: () => invalidateCalendars(qc),
+  });
+}
 
 // ---- Notifications ----
 export const useNotifications = () => useQuery({ queryKey: ['notifications'], queryFn: notificationApi.list });
@@ -174,6 +277,10 @@ export function useAssignShift() {
 // ---- Employees (admin) ----
 export const useStaff = (dept?: string, q?: string) =>
   useQuery({ queryKey: qk.staff(dept, q), queryFn: () => employeeApi.list(dept, q) });
+
+/** Full employee detail (incl. effective compensation + derived rates). */
+export const useEmployee = (id?: string) =>
+  useQuery({ queryKey: ['employees', 'detail', id], queryFn: () => employeeApi.get(id!), enabled: !!id });
 
 export function useCreateEmployee() {
   const qc = useQueryClient();
@@ -216,5 +323,17 @@ export function useUpdateCompany() {
   return useMutation({
     mutationFn: (body: UpdateCompanyBody) => companyApi.update(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['company'] }),
+  });
+}
+
+// ---- Company settings / payroll defaults (admin) ----
+export const useCompanySettings = () =>
+  useQuery({ queryKey: qk.companySettings, queryFn: companySettingsApi.get });
+
+export function useUpdateCompanySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateCompanySettingsBody) => companySettingsApi.update(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['companySettings'] }),
   });
 }

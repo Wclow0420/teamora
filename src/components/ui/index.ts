@@ -16,6 +16,7 @@ export { LiveDot } from './LiveDot';
 export { TextField } from './TextField';
 export { SelectChips } from './SelectChips';
 export type { SelectOption } from './SelectChips';
+export { WeekdayToggles } from './WeekdayToggles';
 export { DateField, toISODate } from './DateField';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';

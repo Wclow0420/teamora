@@ -6,7 +6,6 @@ import com.teamora.attendance.AttendanceStatus;
 import com.teamora.claim.Claim;
 import com.teamora.claim.ClaimRepository;
 import com.teamora.claim.ClaimService;
-import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.dashboard.dto.DashboardResponse;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
@@ -92,17 +91,9 @@ public class DashboardService {
     }
 
     private String currentPayrollNetLabel(UUID companyId) {
-        String period = YearMonth.now(KL).toString();
-        try {
-            return payrollService.summary(period, companyId).netLabel();
-        } catch (ResourceNotFoundException e) {
-            // No payslips for the current month yet — fall back to the company's latest run.
-            try {
-                return payrollService.summary(null, companyId).netLabel();
-            } catch (ResourceNotFoundException e2) {
-                return "0.00";
-            }
-        }
+        // Current month's net if it has a run, else the company's latest, else "0.00".
+        // Uses a non-throwing query so it can't poison the dashboard's read transaction.
+        return payrollService.netLabelForDashboard(YearMonth.now(KL).toString(), companyId);
     }
 
     private DashboardResponse.Week buildWeek(UUID companyId, LocalDate today, long headcount) {

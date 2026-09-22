@@ -11,8 +11,10 @@ public record PendingLeaveResponse(
         UUID id,
         String employeeName,
         String initial,
-        LeaveType type,
+        UUID leaveTypeId,
+        String typeCode,
         String typeLabel,
+        boolean paid,
         String dateRangeLabel,
         String durationLabel,
         String reason,
@@ -25,6 +27,7 @@ public record PendingLeaveResponse(
      */
     public static PendingLeaveResponse from(LeaveRequest r, Integer remaining) {
         Employee e = r.getEmployee();
+        LeaveType t = r.getLeaveType();
         String balanceLabel = remaining == null
                 ? "No balance"
                 : remaining + (remaining == 1 ? " day left" : " days left");
@@ -32,12 +35,14 @@ public record PendingLeaveResponse(
                 r.getId(),
                 e.getFullName(),
                 e.getInitial(),
-                r.getLeaveType(),
-                r.getLeaveType().label(),
+                t.getId(),
+                t.getCode(),
+                t.getName(),
+                t.isPaid(),
                 LeaveLabels.dateRange(r.getStartDate(), r.getEndDate()),
                 LeaveLabels.duration(r.getDays() == null ? 0 : r.getDays()),
                 r.getReason(),
                 balanceLabel,
-                r.getLeaveType().accentColorKey());
+                t.getColorKey());
     }
 }

@@ -14,8 +14,9 @@ class LeaveFlowIT extends AbstractIntegrationTest {
     @Test
     void employeeAppliesForLeave_andItShowsUpPending() throws Exception {
         String token = login("amir@lumi.com", "password");
+        String annual = leaveTypeId(token, "ANNUAL");
         String body = """
-                {"leaveType":"ANNUAL","startDate":"2026-08-10","endDate":"2026-08-12","reason":"Trip"}""";
+                {"leaveTypeId":"%s","startDate":"2026-08-10","endDate":"2026-08-12","reason":"Trip"}""".formatted(annual);
 
         mvc.perform(post("/api/leave/requests").header("Authorization", bearer(token))
                         .contentType("application/json").content(body))
@@ -28,9 +29,10 @@ class LeaveFlowIT extends AbstractIntegrationTest {
     void adminSeesPending_andCanApprove() throws Exception {
         // Amir applies.
         String amir = login("amir@lumi.com", "password");
+        String annual = leaveTypeId(amir, "ANNUAL");
         mvc.perform(post("/api/leave/requests").header("Authorization", bearer(amir))
                         .contentType("application/json")
-                        .content("{\"leaveType\":\"ANNUAL\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-01\",\"reason\":\"Errand\"}"))
+                        .content("{\"leaveTypeId\":\"%s\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-01\",\"reason\":\"Errand\"}".formatted(annual)))
                 .andExpect(status().isOk());
 
         // Admin sees pending requests for the company and approves the first one.

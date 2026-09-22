@@ -27,7 +27,11 @@ export function Card({ children, style, padding = spacing.lg, elevated = true, o
   };
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [base, pressed && { opacity: 0.9 }, style]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        style={({ pressed }) => [base, pressed && { opacity: 0.9 }, style]}
+      >
         {children}
       </Pressable>
     );

@@ -31,9 +31,10 @@ class NotificationFlowIT extends AbstractIntegrationTest {
                         .content("{\"fullName\":\"Emp One\",\"email\":\"nemp-%s@example.com\",\"password\":\"password\",\"role\":\"EMPLOYEE\"}".formatted(slug)))
                 .andExpect(status().isCreated());
         String empToken = login("nemp-" + slug + "@example.com", "password");
+        String annual = leaveTypeId(empToken, "ANNUAL");
 
         var applied = mvc.perform(post("/api/leave/requests").header("Authorization", bearer(empToken)).contentType("application/json")
-                        .content("{\"leaveType\":\"ANNUAL\",\"startDate\":\"2026-09-10\",\"endDate\":\"2026-09-11\",\"reason\":\"x\"}"))
+                        .content("{\"leaveTypeId\":\"%s\",\"startDate\":\"2026-09-10\",\"endDate\":\"2026-09-11\",\"reason\":\"x\"}".formatted(annual)))
                 .andExpect(status().isOk()).andReturn();
         String leaveId = om.readTree(applied.getResponse().getContentAsString()).get("id").asText();
 

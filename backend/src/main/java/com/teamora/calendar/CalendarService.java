@@ -1,7 +1,13 @@
 package com.teamora.calendar;
 
+import com.teamora.calendar.dto.CalendarDtos.CompanyEventResponse;
+import com.teamora.calendar.dto.CalendarDtos.CreateCompanyEventRequest;
 import com.teamora.calendar.dto.CalendarDtos.MonthCalendarResponse;
 import com.teamora.calendar.dto.CalendarDtos.UpcomingEvent;
+import com.teamora.calendar.dto.CalendarDtos.UpdateCompanyEventRequest;
+import com.teamora.common.exception.BadRequestException;
+import com.teamora.common.exception.ResourceNotFoundException;
+import com.teamora.company.Company;
 import com.teamora.employee.Employee;
 import com.teamora.leave.LeaveRequest;
 import com.teamora.leave.LeaveRequestRepository;
@@ -20,6 +26,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * The company calendar: the staff month grid / upcoming list, plus admin CRUD over
+ * {@code company_events}.
+ *
+ * <p><strong>Payroll depends on this data.</strong> {@link EventType#HOLIDAY} rows are read by
+ * {@code CompensationService} when a payroll run computes holiday pay (and they are excluded from
+ * unpaid-leave deductions), so adding, editing, re-dating or deleting a HOLIDAY changes what
+ * <em>future</em> payroll runs pay for that period. Re-running payroll is idempotent and never
+ * clobbers an APPROVED/PAID payslip, so already-approved periods are unaffected.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -55,8 +71,9 @@ public class CalendarService {
             }
             LocalDate from = r.getStartDate().isAfter(monthStart) ? r.getStartDate() : monthStart;
             LocalDate to = r.getEndDate().isBefore(monthEnd) ? r.getEndDate() : monthEnd;
+            String accent = r.getLeaveType() != null ? r.getLeaveType().getColorKey() : LEAVE_ACCENT;
             for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
-                addDot(dots, d.getDayOfMonth(), LEAVE_ACCENT);
+                addDot(dots, d.getDayOfMonth(), accent);
             }
         }
 
@@ -69,6 +86,81 @@ public class CalendarService {
                 .toList();
 
         return new MonthCalendarResponse(MONTH_FMT.format(ym), dots, upcoming);
+    }
+
+    // ---------- Admin CRUD ----------
+
+    /** Every company event in {@code ym}, earliest first. */
+    public List<CompanyEventResponse> listForMonth(UUID companyId, YearMonth ym) {
+        return events.findByCompanyIdAndEventDateBetweenOrderByEventDateAsc(
+                        companyId, ym.atDay(1), ym.atEndOfMonth()).stream()
+                .map(CompanyEventResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public CompanyEventResponse create(Company company, CreateCompanyEventRequest req) {
+        CompanyEvent e = CompanyEvent.builder()
+                .title(req.title().trim())
+                .eventDate(req.eventDate())
+                .eventType(requireAuthorable(req.eventType()))
+                .timeLabel(normaliseTimeLabel(req.timeLabel()))
+                .build();
+        e.setCompany(company);
+        return CompanyEventResponse.from(events.save(e));
+    }
+
+    @Transactional
+    public CompanyEventResponse update(UUID companyId, UUID id, UpdateCompanyEventRequest req) {
+        CompanyEvent e = requireInCompany(companyId, id);
+        if (req.title() != null) {
+            if (req.title().isBlank()) {
+                throw new BadRequestException("Title cannot be blank");
+            }
+            e.setTitle(req.title().trim());
+        }
+        if (req.eventDate() != null) {
+            e.setEventDate(req.eventDate());
+        }
+        if (req.eventType() != null) {
+            e.setEventType(requireAuthorable(req.eventType()));
+        }
+        if (req.timeLabel() != null) {
+            // An explicit blank clears the label.
+            e.setTimeLabel(normaliseTimeLabel(req.timeLabel()));
+        }
+        return CompanyEventResponse.from(e);
+    }
+
+    @Transactional
+    public void delete(UUID companyId, UUID id) {
+        events.delete(requireInCompany(companyId, id));
+    }
+
+    /** Resolve an event by id within the caller's company — a foreign row is a 404, never a peek. */
+    private CompanyEvent requireInCompany(UUID companyId, UUID id) {
+        CompanyEvent e = events.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of("CompanyEvent", id));
+        if (!e.getCompany().getId().equals(companyId)) {
+            throw ResourceNotFoundException.of("CompanyEvent", id);
+        }
+        return e;
+    }
+
+    /** Birthdays are derived from employee records, so they cannot be hand-authored. */
+    private static EventType requireAuthorable(EventType type) {
+        if (type == EventType.BIRTHDAY) {
+            throw new BadRequestException("Birthdays are derived from employee records and cannot be created here");
+        }
+        return type;
+    }
+
+    private static String normaliseTimeLabel(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private static void addDot(Map<Integer, List<String>> dots, int day, String accentKey) {

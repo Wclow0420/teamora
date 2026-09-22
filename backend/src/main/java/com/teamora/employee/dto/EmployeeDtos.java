@@ -1,8 +1,11 @@
 package com.teamora.employee.dto;
 
 import com.teamora.employee.MaritalStatus;
+import com.teamora.employee.PayBasis;
 import com.teamora.employee.Role;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -26,10 +29,21 @@ public final class EmployeeDtos {
             String staffId,
             String phone,
             UUID reportingManagerId,
+            UUID workLocationId,
             @PositiveOrZero BigDecimal monthlySalary,
             MaritalStatus maritalStatus,
             Boolean spouseWorking,
-            @PositiveOrZero Integer numChildren
+            @PositiveOrZero Integer numChildren,
+            PayBasis payBasis,
+            @Min(0) @Max(127) Integer workingDays,
+            @PositiveOrZero BigDecimal hoursPerDay,
+            // Statutory & bank identity (all optional)
+            String nric,
+            String epfNo,
+            String socsoNo,
+            String taxNo,
+            String bankName,
+            String bankAccountNo
     ) {}
 
     public record ChangeRoleRequest(@NotNull Role role) {}
@@ -43,10 +57,21 @@ public final class EmployeeDtos {
             String staffId,
             Role role,
             UUID reportingManagerId,
+            UUID workLocationId,
             @PositiveOrZero BigDecimal monthlySalary,
             MaritalStatus maritalStatus,
             Boolean spouseWorking,
-            @PositiveOrZero Integer numChildren
+            @PositiveOrZero Integer numChildren,
+            PayBasis payBasis,
+            @Min(0) @Max(127) Integer workingDays,
+            @PositiveOrZero BigDecimal hoursPerDay,
+            // Statutory & bank identity (all optional)
+            String nric,
+            String epfNo,
+            String socsoNo,
+            String taxNo,
+            String bankName,
+            String bankAccountNo
     ) {}
 
     /** Lightweight option for the "reporting manager" picker. */

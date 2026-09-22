@@ -5,13 +5,19 @@ import com.teamora.attendance.dto.AttendanceSummaryResponse;
 import com.teamora.attendance.dto.LiveAttendanceResponse;
 import com.teamora.attendance.dto.LiveStaffRow;
 import com.teamora.attendance.dto.TodayStatusResponse;
+import com.teamora.common.GeoUtil;
 import com.teamora.common.exception.BadRequestException;
+import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
+import com.teamora.location.WorkLocation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.Base64;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +40,10 @@ public class AttendanceService {
     private static final LocalTime LATE_AFTER = LocalTime.of(9, 5);
     private static final String DEFAULT_LOCATION = "Bangsar South HQ";
 
+    /** Cap on the decoded selfie size (~2 MB) — clients downscale before sending. */
+    private static final int MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+    private static final String DEFAULT_PHOTO_TYPE = "image/jpeg";
+
     private final AttendanceRepository attendance;
     private final EmployeeRepository employees;
 
@@ -44,7 +54,13 @@ public class AttendanceService {
     // ---------- Clock in / out ----------
 
     @Transactional
-    public TodayStatusResponse clockIn(Employee current) {
+    public TodayStatusResponse clockIn(Employee current, BigDecimal latitude, BigDecimal longitude) {
+        return clockIn(current, latitude, longitude, null);
+    }
+
+    @Transactional
+    public TodayStatusResponse clockIn(Employee current, BigDecimal latitude, BigDecimal longitude,
+                                       String photoBase64) {
         LocalDate day = today();
         AttendanceRecord record = attendance
                 .findByEmployeeIdAndWorkDate(current.getId(), day)
@@ -52,6 +68,13 @@ public class AttendanceService {
 
         if (record != null && record.getClockInAt() != null) {
             throw new BadRequestException("Already clocked in today");
+        }
+
+        // Geofence: if the employee is assigned to an active work location, the
+        // phone must be within its radius. Unassigned/inactive → no geofence.
+        WorkLocation site = assignedActiveSite(current);
+        if (site != null) {
+            enforceGeofence(site, latitude, longitude);
         }
 
         Instant now = Instant.now();
@@ -69,9 +92,79 @@ public class AttendanceService {
         }
         record.setClockInAt(now);
         record.setStatus(status);
-        record.setLocation(DEFAULT_LOCATION);
+        record.setLocation(site != null ? site.getName() : DEFAULT_LOCATION);
+        record.setClockInLat(latitude);
+        record.setClockInLng(longitude);
+
+        // Optional selfie proof — non-blocking: absent → clock-in proceeds unchanged.
+        if (photoBase64 != null && !photoBase64.isBlank()) {
+            DecodedPhoto photo = decodePhoto(photoBase64);
+            record.setClockInPhoto(photo.bytes());
+            record.setClockInPhotoType(photo.contentType());
+        }
 
         return TodayStatusResponse.from(attendance.save(record));
+    }
+
+    /** Bare base64 or a {@code data:image/...;base64,...} data URL → decoded bytes + content-type. */
+    private DecodedPhoto decodePhoto(String raw) {
+        String data = raw.trim();
+        String contentType = DEFAULT_PHOTO_TYPE;
+        if (data.startsWith("data:")) {
+            int comma = data.indexOf(',');
+            if (comma < 0) {
+                throw new BadRequestException("Invalid photo data URL");
+            }
+            String header = data.substring(5, comma); // e.g. "image/jpeg;base64"
+            int semi = header.indexOf(';');
+            String mime = (semi >= 0 ? header.substring(0, semi) : header).trim();
+            if (mime.startsWith("image/")) {
+                contentType = mime;
+            }
+            data = data.substring(comma + 1);
+        }
+        data = data.replaceAll("\\s", "");
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(data);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid photo encoding");
+        }
+        if (bytes.length == 0) {
+            throw new BadRequestException("Photo is empty");
+        }
+        if (bytes.length > MAX_PHOTO_BYTES) {
+            throw new BadRequestException("Photo too large (max 2 MB). Please retake.");
+        }
+        return new DecodedPhoto(bytes, contentType);
+    }
+
+    private record DecodedPhoto(byte[] bytes, String contentType) {}
+
+    /** The employee's assigned work location, only if it exists and is active. */
+    private WorkLocation assignedActiveSite(Employee current) {
+        WorkLocation site = employees
+                .findByIdAndCompanyIdWithWorkLocation(current.getId(), current.getCompany().getId())
+                .map(Employee::getWorkLocation)
+                .orElse(null);
+        return (site != null && site.isActive()) ? site : null;
+    }
+
+    /** Reject the clock-in unless the given coordinates are within the site's radius. */
+    private void enforceGeofence(WorkLocation site, BigDecimal latitude, BigDecimal longitude) {
+        if (latitude == null || longitude == null) {
+            throw new BadRequestException(
+                    "Location required to clock in at " + site.getName()
+                            + ". Enable location access and try again.");
+        }
+        double distance = GeoUtil.distanceMeters(
+                site.getLatitude().doubleValue(), site.getLongitude().doubleValue(),
+                latitude.doubleValue(), longitude.doubleValue());
+        if (distance > site.getRadiusM()) {
+            throw new BadRequestException(
+                    "You're ~" + Math.round(distance) + " m from " + site.getName()
+                            + ". Move within " + site.getRadiusM() + " m to clock in.");
+        }
     }
 
     @Transactional
@@ -101,6 +194,33 @@ public class AttendanceService {
         return TodayStatusResponse.from(
                 attendance.findByEmployeeIdAndWorkDate(current.getId(), today()).orElse(null));
     }
+
+    /**
+     * Streamable clock-in selfie for an attendance record. Access: the record's
+     * own employee, OR a management-role user (OWNER/HR_ADMIN/MANAGER) in the
+     * same company (tenant-scoped). 404 if the record or its photo is missing.
+     */
+    public PhotoData getPhoto(Employee current, UUID recordId) {
+        AttendanceRecord record = attendance.findById(recordId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Attendance record", recordId));
+
+        boolean isSelf = record.getEmployee().getId().equals(current.getId());
+        boolean isSameCompanyAdmin = current.getRole().isManagement()
+                && record.getCompany().getId().equals(current.getCompany().getId());
+        if (!isSelf && !isSameCompanyAdmin) {
+            throw new AccessDeniedException("You cannot view this attendance photo");
+        }
+
+        byte[] bytes = record.getClockInPhoto();
+        if (bytes == null || bytes.length == 0) {
+            throw ResourceNotFoundException.of("Attendance photo", recordId);
+        }
+        String type = record.getClockInPhotoType();
+        return new PhotoData(bytes, type != null && !type.isBlank() ? type : DEFAULT_PHOTO_TYPE);
+    }
+
+    /** Raw selfie bytes + content-type for the photo endpoint. */
+    public record PhotoData(byte[] bytes, String contentType) {}
 
     public AttendanceSummaryResponse myHistory(Employee current, String month) {
         YearMonth ym = parseMonth(month);

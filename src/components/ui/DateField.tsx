@@ -25,6 +25,9 @@ export function DateField({ label, value, onChange, minimumDate, maximumDate }: 
       {label && <Text style={[font(700), { fontSize: 12, color: palette.soft, marginBottom: 7 }]}>{label}</Text>}
       <Pressable
         onPress={() => setShow((s) => !s)}
+        accessibilityRole="button"
+        accessibilityLabel={`${label ? `${label}, ` : ''}${format(value)}`}
+        accessibilityHint="Opens a date picker"
         style={{
           height: 52,
           borderRadius: radius.lg,

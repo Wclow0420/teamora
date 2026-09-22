@@ -7,7 +7,8 @@ import { palette, font, radius } from '@/theme';
 
 /** Shared approval cards used by both the manager inbox and the admin Approvals screen. */
 
-const leaveIcon = (type: string): IconName => (type.toUpperCase() === 'MEDICAL' ? 'shield' : 'sun');
+/** Leave types are now company-configurable, so use one neutral leave icon. */
+const LEAVE_ICON: IconName = 'sun';
 
 type DecideProps = { pending: boolean; onApprove: () => void; onReject: () => void };
 
@@ -37,7 +38,7 @@ export function LeaveApprovalCard({ item, pending, onApprove, onReject }: { item
           <Text style={[font(700), { fontSize: 14, color: palette.ink }]} numberOfLines={1}>{item.employeeName}</Text>
           <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 5 }]}>{item.balanceLabel}</Text>
         </View>
-        <Chip label={item.typeLabel} background={accent.bg} color={accent.color} leading={<Icon name={leaveIcon(item.type)} size={13} color={accent.color} />} />
+        <Chip label={item.typeLabel} background={accent.bg} color={accent.color} leading={<Icon name={LEAVE_ICON} size={13} color={accent.color} />} />
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13, paddingVertical: 10, paddingHorizontal: 13, borderRadius: 13, backgroundColor: palette.bg }}>
         <Icon name="calendar" size={16} color={palette.soft} />

@@ -12,11 +12,17 @@ public record LiveStaffRow(
         String department,
         AttendanceStatus status,
         String time,
-        String accentColorKey
+        String accentColorKey,
+        /** Today's attendance record id (null if the employee hasn't clocked in). */
+        java.util.UUID attendanceRecordId,
+        /** True when that record has a stored clock-in selfie — the app builds the photo URL. */
+        boolean hasPhoto
 ) {
     public static LiveStaffRow from(Employee e, AttendanceRecord r) {
         AttendanceStatus status = r != null ? r.getStatus() : AttendanceStatus.ABSENT;
         String time = timeLabel(status, r);
+        // Derive hasPhoto from the (always-loaded) type column, not the bytes.
+        boolean hasPhoto = r != null && r.getClockInPhotoType() != null;
         return new LiveStaffRow(
                 e.getId(),
                 e.getFullName(),
@@ -24,7 +30,9 @@ public record LiveStaffRow(
                 e.getDepartment(),
                 status,
                 time,
-                accentKey(status)
+                accentKey(status),
+                r != null ? r.getId() : null,
+                hasPhoto
         );
     }
 

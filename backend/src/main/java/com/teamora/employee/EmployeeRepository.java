@@ -36,14 +36,19 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
     // ---- Fetch-join variants so list/get can expose the reporting-manager name
     //      without N+1 or lazy-init issues. ----
-    @Query("select e from Employee e join fetch e.company left join fetch e.reportingManager where e.id = :id and e.company.id = :companyId")
+    @Query("select e from Employee e join fetch e.company left join fetch e.reportingManager left join fetch e.workLocation where e.id = :id and e.company.id = :companyId")
     Optional<Employee> findByIdAndCompanyIdWithManager(@Param("id") UUID id, @Param("companyId") UUID companyId);
+
+    /** Loads the employee with its (initialized) assigned work location for geofence checks. */
+    @Query("select e from Employee e join fetch e.company left join fetch e.workLocation where e.id = :id and e.company.id = :companyId")
+    Optional<Employee> findByIdAndCompanyIdWithWorkLocation(@Param("id") UUID id, @Param("companyId") UUID companyId);
 
     // Empty-string sentinels (not null) so Postgres types the params as text.
     @Query("""
             select e from Employee e
             join fetch e.company
             left join fetch e.reportingManager
+            left join fetch e.workLocation
             where e.company.id = :companyId
               and (:dept = '' or lower(e.department) = lower(:dept))
               and (:q = '' or lower(e.fullName) like lower(concat('%', :q, '%'))

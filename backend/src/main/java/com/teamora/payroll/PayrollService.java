@@ -39,6 +39,7 @@ public class PayrollService {
     private final EmployeeRepository employees;
     private final OvertimeRepository overtime;
     private final ClaimRepository claims;
+    private final CompensationService compensationService;
 
     // ---------------- Staff reads ----------------
 
@@ -116,6 +117,26 @@ public class PayrollService {
         );
     }
 
+    /**
+     * Net-total label for the admin Dashboard tile: the given period if it has a run,
+     * else the company's latest run, else "0.00". Unlike {@link #summary}, this never
+     * throws — so it's safe to call inside the dashboard's shared read transaction
+     * (a thrown exception would mark that transaction rollback-only).
+     */
+    public String netLabelForDashboard(String period, UUID companyId) {
+        String resolved = period;
+        if (resolved == null || resolved.isBlank()
+                || payslips.findByPeriodAndCompanyId(resolved, companyId).isEmpty()) {
+            resolved = payslips.findLatestPeriodByCompanyId(companyId);
+        }
+        if (resolved == null) {
+            return PayslipFormat.money(BigDecimal.ZERO);
+        }
+        List<Payslip> run = payslips.findByPeriodAndCompanyId(resolved, companyId);
+        BigDecimal net = run.stream().map(Payslip::getNet).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return PayslipFormat.money(net);
+    }
+
     // ---------------- Admin payroll run engine ----------------
 
     /** Current state of a period's run for the admin screen (generated=false if none yet). */
@@ -154,6 +175,11 @@ public class PayrollService {
                 continue; // locked — don't clobber a finalised payslip
             }
 
+            // Paid basic = monthly salary less unpaid-leave days (schedule-driven), per the
+            // employee's pay basis. OT stays EA statutory (on the full monthly salary) — unchanged.
+            CompensationService.Compensation comp = compensationService.forPeriod(e, ym);
+            BigDecimal paidBasic = comp.paidBasic();
+
             BigDecimal overtimePay = overtimePay(e.getId(), salary, from, to);
             BigDecimal claimsTotal = claims.sumAmount(e.getId(), ClaimStatus.APPROVED, from, to);
             BigDecimal bonus = BigDecimal.ZERO;
@@ -162,13 +188,17 @@ public class PayrollService {
                     e.getMaritalStatus() == MaritalStatus.MARRIED,
                     Boolean.TRUE.equals(e.getSpouseWorking()),
                     e.getNumChildren());
-            PayrollCalculator.Breakdown b = PayrollCalculator.compute(salary, overtimePay, claimsTotal, bonus, profile);
+            PayrollCalculator.Breakdown b = PayrollCalculator.compute(paidBasic, overtimePay, claimsTotal, bonus, profile);
 
             Payslip p = existing != null ? existing : new Payslip();
             p.setEmployee(e);
             p.setCompany(e.getCompany());
             p.setPeriod(ym.toString());
             p.setBasic(b.basic());
+            p.setUnpaidDays(comp.unpaidDays());
+            p.setUnpaidDeduction(comp.unpaidDeduction());
+            p.setPaidDays(comp.paidDays());
+            p.setDailyRate(comp.dailyRate());
             p.setOvertime(b.overtime());
             p.setClaims(b.claims());
             p.setBonus(b.bonus());

@@ -16,7 +16,7 @@ Both share one **"Warm & Human"** design system (cream + coral, Figtree).
 
 ```bash
 npm install
-npm run start      # then press i (iOS), a (Android), or w (web)
+npm run start      # then press i (iOS) or a (Android)
 ```
 
 ## The secret admin portal

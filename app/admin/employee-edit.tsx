@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { Avatar, Button, Card, Chip, Icon, ScreenHeader, SelectChips, TextField, type SelectOption } from '@/components/ui';
 import { ReportingManagerField } from '@/components/ReportingManagerField';
-import { useMe, useTransferOwnership, useUpdateEmployee } from '@/api/queries';
+import { WorkLocationField } from '@/components/WorkLocationField';
+import { CompensationFields } from '@/components/CompensationFields';
+import { StatutoryBankFields } from '@/components/StatutoryBankFields';
+import { useCompanySettings, useEmployee, useMe, useTransferOwnership, useUpdateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
-import type { MaritalStatus, Role } from '@/api/types';
+import type { MaritalStatus, PayBasis, Role } from '@/api/types';
+import { WEEKDAYS_MASK } from '@/lib/workweek';
 import { palette, font, tint } from '@/theme';
+
+/** Parse a pay-basis param string, defaulting to MONTHLY. */
+function parsePayBasis(v: string | undefined): PayBasis {
+  return v === 'DAILY' || v === 'HOURLY' ? v : 'MONTHLY';
+}
+/** Parse an hours-per-day input → a positive number, or undefined if blank/invalid. */
+function parseHours(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 
 type EditableRole = Extract<Role, 'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'>;
 
@@ -53,14 +69,20 @@ export default function EmployeeEdit() {
     department?: string;
     role: Role;
     reportingManagerId?: string;
+    workLocationId?: string;
+    workLocationName?: string;
     monthlySalary?: string;
     maritalStatus?: string;
     spouseWorking?: string;
     numChildren?: string;
+    payBasis?: string;
+    workingDays?: string;
+    hoursPerDay?: string;
   }>();
   const me = useMe();
   const update = useUpdateEmployee();
   const transfer = useTransferOwnership();
+  const settings = useCompanySettings();
 
   const targetIsOwner = params.role === 'OWNER';
   const iAmOwner = me.data?.role === 'OWNER';
@@ -73,10 +95,62 @@ export default function EmployeeEdit() {
   const [salary, setSalary] = useState(params.monthlySalary ?? '');
   const [role, setRole] = useState<EditableRole>(targetIsOwner ? 'HR_ADMIN' : ((params.role as EditableRole) ?? 'EMPLOYEE'));
   const [reportingManagerId, setReportingManagerId] = useState<string | undefined>(params.reportingManagerId || undefined);
+  const [workLocationId, setWorkLocationId] = useState<string | undefined>(params.workLocationId || undefined);
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(params.maritalStatus === 'MARRIED' ? 'MARRIED' : 'SINGLE');
   const [spouseWorking, setSpouseWorking] = useState<'WORKING' | 'NOT_WORKING'>(params.spouseWorking === 'true' ? 'WORKING' : 'NOT_WORKING');
   const [children, setChildren] = useState(params.numChildren ?? '');
+  // Statutory & bank identity — the staff LIST omits these, so seed from detail.
+  const [nric, setNric] = useState('');
+  const [epfNo, setEpfNo] = useState('');
+  const [socsoNo, setSocsoNo] = useState('');
+  const [taxNo, setTaxNo] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNo, setBankAccountNo] = useState('');
+  const [seededStatutory, setSeededStatutory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Compensation — the staff LIST omits these fields, so seed from the employee
+  // DETAIL endpoint (effective values); only fall back to company defaults if the
+  // detail can't be loaded.
+  const detail = useEmployee(params.id);
+  const [payBasis, setPayBasis] = useState<PayBasis>(parsePayBasis(params.payBasis));
+  const [workingDays, setWorkingDays] = useState<number>(
+    params.workingDays ? Number(params.workingDays) : WEEKDAYS_MASK,
+  );
+  const [hoursPerDay, setHoursPerDay] = useState(params.hoursPerDay || '8');
+  const [seeded, setSeeded] = useState(false);
+
+  useEffect(() => {
+    if (seeded) return;
+    const d = detail.data;
+    if (d) {
+      // Detail is authoritative — effective pay basis / schedule / hours.
+      if (d.payBasis) setPayBasis(parsePayBasis(d.payBasis));
+      if (d.workingDays != null) setWorkingDays(d.workingDays);
+      if (d.hoursPerDay != null) setHoursPerDay(String(d.hoursPerDay));
+      setWorkLocationId(d.workLocationId ?? undefined);
+      setSeeded(true);
+    } else if (detail.isError && settings.data) {
+      // Fallback: detail unavailable → company defaults.
+      setPayBasis(settings.data.defaultPayBasis);
+      setWorkingDays(settings.data.defaultWorkingDays);
+      setHoursPerDay(String(settings.data.defaultHoursPerDay));
+      setSeeded(true);
+    }
+  }, [seeded, detail.data, detail.isError, settings.data]);
+
+  // Seed statutory & bank fields from the detail endpoint (list omits them).
+  useEffect(() => {
+    if (seededStatutory || !detail.data) return;
+    const d = detail.data;
+    setNric(d.nric ?? '');
+    setEpfNo(d.epfNo ?? '');
+    setSocsoNo(d.socsoNo ?? '');
+    setTaxNo(d.taxNo ?? '');
+    setBankName(d.bankName ?? '');
+    setBankAccountNo(d.bankAccountNo ?? '');
+    setSeededStatutory(true);
+  }, [seededStatutory, detail.data]);
 
   const initial = (params.name ?? '?').charAt(0).toUpperCase();
 
@@ -106,9 +180,19 @@ export default function EmployeeEdit() {
           department: department.trim(),
           monthlySalary,
           reportingManagerId,
+          workLocationId: workLocationId ?? null,
           maritalStatus,
           spouseWorking: maritalStatus === 'MARRIED' ? spouseWorking === 'WORKING' : undefined,
           numChildren,
+          payBasis,
+          workingDays,
+          hoursPerDay: parseHours(hoursPerDay),
+          nric: nric.trim(),
+          epfNo: epfNo.trim(),
+          socsoNo: socsoNo.trim(),
+          taxNo: taxNo.trim(),
+          bankName: bankName.trim(),
+          bankAccountNo: bankAccountNo.trim(),
           // Never send a role for the owner (changed only via transfer).
           role: targetIsOwner ? undefined : role,
         },
@@ -184,6 +268,21 @@ export default function EmployeeEdit() {
           <SelectChips label="Role" options={ROLE_OPTIONS} value={role} onChange={setRole} />
         )}
         <ReportingManagerField value={reportingManagerId} onChange={setReportingManagerId} />
+        <WorkLocationField
+          value={workLocationId}
+          onChange={setWorkLocationId}
+          currentName={detail.data?.workLocationName ?? params.workLocationName}
+        />
+
+        <CompensationFields
+          monthlySalary={parseSalary(salary) ?? null}
+          payBasis={payBasis}
+          onPayBasis={setPayBasis}
+          workingDays={workingDays}
+          onWorkingDays={setWorkingDays}
+          hoursPerDay={hoursPerDay}
+          onHoursPerDay={setHoursPerDay}
+        />
 
         <View style={{ gap: 14, marginTop: 4 }}>
           <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>Tax profile</Text>
@@ -202,6 +301,21 @@ export default function EmployeeEdit() {
             placeholder="e.g. 2"
           />
         </View>
+
+        <StatutoryBankFields
+          nric={nric}
+          onNric={setNric}
+          epfNo={epfNo}
+          onEpfNo={setEpfNo}
+          socsoNo={socsoNo}
+          onSocsoNo={setSocsoNo}
+          taxNo={taxNo}
+          onTaxNo={setTaxNo}
+          bankName={bankName}
+          onBankName={setBankName}
+          bankAccountNo={bankAccountNo}
+          onBankAccountNo={setBankAccountNo}
+        />
 
         {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
       </View>

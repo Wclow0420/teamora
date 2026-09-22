@@ -2,11 +2,13 @@ package com.teamora.seed;
 
 import com.teamora.company.Company;
 import com.teamora.company.CompanyRepository;
+import com.teamora.company.CompanySettingsService;
 import com.teamora.config.TeamoraProperties;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
 import com.teamora.employee.MaritalStatus;
 import com.teamora.employee.Role;
+import com.teamora.leave.LeaveTypeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -37,6 +39,8 @@ public class EmployeeSeeder implements CommandLineRunner {
     private final EmployeeRepository employees;
     private final PasswordEncoder passwordEncoder;
     private final TeamoraProperties props;
+    private final LeaveTypeService leaveTypeService;
+    private final CompanySettingsService companySettingsService;
 
     @Override
     @Transactional
@@ -48,6 +52,8 @@ public class EmployeeSeeder implements CommandLineRunner {
 
         // ---- Tenant A: Lumi Foods (the rich demo company) ----
         Company lumi = companies.save(company("Lumi Foods Sdn Bhd", "lumi-foods", "Bangsar South HQ"));
+        companySettingsService.createDefaults(lumi);
+        leaveTypeService.seedDefaults(lumi);
         Employee sarah = emp(lumi, "sarah@lumi.com", "Sarah Lim", Role.HR_ADMIN, "HR Manager", "People", "EMP-001", pw, LocalDate.of(2021, 4, 1));
         Employee nadia = emp(lumi, "nadia@lumi.com", "Nadia Rahman", Role.MANAGER, "Marketing Lead", "Marketing", "EMP-018", pw, LocalDate.of(2023, 5, 15));
         Employee amir = emp(lumi, "amir@lumi.com", "Amir Hakim", Role.EMPLOYEE, "Sales Executive", "Retail", "EMP-042", pw, LocalDate.of(2024, 2, 1));
@@ -99,6 +105,8 @@ public class EmployeeSeeder implements CommandLineRunner {
 
         // ---- Tenant B: Nusantara Tech (proves isolation) ----
         Company nusantara = companies.save(company("Nusantara Tech Sdn Bhd", "nusantara-tech", "Cyberjaya HQ"));
+        companySettingsService.createDefaults(nusantara);
+        leaveTypeService.seedDefaults(nusantara);
         Employee daniel = emp(nusantara, "admin@nusantara.com", "Daniel Wong", Role.OWNER, "CEO", "Leadership", "NT-001", pw, LocalDate.of(2019, 7, 1));
         Employee budi = emp(nusantara, "budi@nusantara.com", "Budi Santoso", Role.EMPLOYEE, "Backend Engineer", "Engineering", "NT-014", pw, LocalDate.of(2023, 2, 13));
         daniel.setMonthlySalary(money(15000));
