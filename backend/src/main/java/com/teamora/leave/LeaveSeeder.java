@@ -10,6 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -60,9 +61,9 @@ public class LeaveSeeder implements CommandLineRunner {
 
         List<LeaveBalance> seededBalances = new ArrayList<>();
         if (balances.count() == 0) {
-            seededBalances.add(balance(amir.get(), annual, 16, 4));
-            seededBalances.add(balance(amir.get(), medical, 14, 6));
-            seededBalances.add(balance(amir.get(), emergency, 5, 2));
+            seededBalances.add(balance(amir.get(), annual, "16", "4"));
+            seededBalances.add(balance(amir.get(), medical, "14", "6"));
+            seededBalances.add(balance(amir.get(), emergency, "5", "2"));
             balances.saveAll(seededBalances);
         }
 
@@ -99,12 +100,12 @@ public class LeaveSeeder implements CommandLineRunner {
                 .orElseThrow(() -> new IllegalStateException("Missing seeded leave type " + code + " for company " + companyId));
     }
 
-    private LeaveBalance balance(Employee e, LeaveType type, int entitled, int used) {
+    private LeaveBalance balance(Employee e, LeaveType type, String entitled, String used) {
         LeaveBalance b = LeaveBalance.builder()
                 .employee(e)
                 .leaveType(type)
-                .entitled(entitled)
-                .used(used)
+                .entitled(new BigDecimal(entitled).setScale(2))
+                .used(new BigDecimal(used).setScale(2))
                 .build();
         b.setCompany(e.getCompany());
         return b;
@@ -141,7 +142,11 @@ public class LeaveSeeder implements CommandLineRunner {
         return r;
     }
 
-    private int days(LocalDate start, LocalDate end) {
-        return (int) (ChronoUnit.DAYS.between(start, end) + 1);
+    /**
+     * Demo requests are plain full-day ranges that already sit on weekdays, so the
+     * inclusive count matches the working-day count the calculator would produce.
+     */
+    private BigDecimal days(LocalDate start, LocalDate end) {
+        return BigDecimal.valueOf(ChronoUnit.DAYS.between(start, end) + 1).setScale(2);
     }
 }

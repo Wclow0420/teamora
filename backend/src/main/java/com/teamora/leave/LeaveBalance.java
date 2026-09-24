@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /** An employee's entitlement and consumption for a single {@link LeaveType}. */
@@ -20,6 +21,9 @@ import java.util.UUID;
 @Entity
 @Table(name = "leave_balances")
 public class LeaveBalance extends TenantEntity {
+
+    /** Days are fractional since partial-day leave — always kept at 2dp. */
+    public static final int DAY_SCALE = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -33,16 +37,28 @@ public class LeaveBalance extends TenantEntity {
     @JoinColumn(name = "leave_type_id", nullable = false)
     private LeaveType leaveType;
 
-    @Column(nullable = false)
-    private Integer entitled;
+    @Column(nullable = false, precision = 6, scale = 2)
+    private BigDecimal entitled;
 
-    @Column(nullable = false)
-    private Integer used;
+    @Column(nullable = false, precision = 6, scale = 2)
+    private BigDecimal used;
 
-    /** Days still available. */
-    public int remaining() {
-        int e = entitled == null ? 0 : entitled;
-        int u = used == null ? 0 : used;
-        return e - u;
+    /** Entitled days, never null, at 2dp. */
+    public BigDecimal entitledOrZero() {
+        return scaled(entitled);
+    }
+
+    /** Used days, never null, at 2dp. */
+    public BigDecimal usedOrZero() {
+        return scaled(used);
+    }
+
+    /** Days still available (may be fractional; can go negative if over-taken). */
+    public BigDecimal remaining() {
+        return entitledOrZero().subtract(usedOrZero());
+    }
+
+    private static BigDecimal scaled(BigDecimal v) {
+        return (v == null ? BigDecimal.ZERO : v).setScale(DAY_SCALE, java.math.RoundingMode.HALF_UP);
     }
 }

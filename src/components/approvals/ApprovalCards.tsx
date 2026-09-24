@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { Avatar, Button, Card, Chip, Icon, type IconName } from '@/components/ui';
 import { accentFromKey } from '@/api/accents';
 import type { PendingClaim, PendingLeave, PendingOvertime } from '@/api/types';
-import { palette, font, radius } from '@/theme';
+import { palette, font, radius, tint } from '@/theme';
 
 /** Shared approval cards used by both the manager inbox and the admin Approvals screen. */
 
@@ -30,6 +30,9 @@ export function DecideRow({ pending, onApprove, onReject }: DecideProps) {
 
 export function LeaveApprovalCard({ item, pending, onApprove, onReject }: { item: PendingLeave } & DecideProps) {
   const accent = accentFromKey(item.accentColorKey);
+  // Partial-day requests (half day / hours) are flagged so an approver never
+  // mistakes a 2-hour slice for a full day off.
+  const partial = item.durationUnit === 'HALF_DAY' || item.durationUnit === 'HOURS';
   return (
     <Card padding={16} style={{ borderRadius: radius['2xl'] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -42,7 +45,17 @@ export function LeaveApprovalCard({ item, pending, onApprove, onReject }: { item
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13, paddingVertical: 10, paddingHorizontal: 13, borderRadius: 13, backgroundColor: palette.bg }}>
         <Icon name="calendar" size={16} color={palette.soft} />
-        <Text style={[font(700), { fontSize: 12.5, color: palette.ink }]}>{item.dateRangeLabel}</Text>
+        <Text style={[font(700), { flex: 1, fontSize: 12.5, color: palette.ink }]} numberOfLines={1}>
+          {item.dateRangeLabel}
+        </Text>
+        {!!item.durationLabel && (
+          <Chip
+            label={item.durationLabel}
+            size="sm"
+            color={partial ? palette.amber : palette.soft}
+            background={partial ? tint.amber : palette.surface}
+          />
+        )}
       </View>
       {item.reason && <Text style={[font(500), { fontSize: 12.5, lineHeight: 18, color: palette.soft, marginTop: 11 }]}>{item.reason}</Text>}
       <DecideRow pending={pending} onApprove={onApprove} onReject={onReject} />

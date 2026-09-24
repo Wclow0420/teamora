@@ -6,6 +6,7 @@ import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { usePayslips, useMe } from '@/api/queries';
 import { sharePayslipPdf } from '@/lib/payslipPdf';
 import type { Payslip } from '@/api/types';
+import { formatDays } from '@/lib/numbers';
 import { palette, font, radius, tint } from '@/theme';
 
 /** Parse a money label like "4,285.50" → 4285.5. */
@@ -100,7 +101,7 @@ export default function Payroll() {
                 <IconTile icon="sun" color={palette.amber} background={palette.white} size={36} iconSize={19} cornerRadius={12} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>
-                    Unpaid leave · {payslip.unpaidDaysLabel ?? `${payslip.unpaidDays} days`}
+                    Unpaid leave · {payslip.unpaidDaysLabel ?? formatDays(payslip.unpaidDays)}
                   </Text>
                   <Text style={[font(500), { fontSize: 11.5, color: palette.soft, marginTop: 4, lineHeight: 16 }]}>
                     − RM {payslip.unpaidDeductionLabel ?? money(payslip.unpaidDeduction ?? 0)}

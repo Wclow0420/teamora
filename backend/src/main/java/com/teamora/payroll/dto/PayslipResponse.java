@@ -22,7 +22,7 @@ public record PayslipResponse(
         String socsoLabel,
         String eisLabel,
         String pcbLabel,
-        int unpaidDays,
+        BigDecimal unpaidDays,
         String unpaidDaysLabel,
         String unpaidDeductionLabel,
         String dailyRateLabel,
@@ -32,10 +32,11 @@ public record PayslipResponse(
         String bankLabel
 ) {
     public static PayslipResponse from(Payslip p) {
-        int unpaidDays = p.getUnpaidDays();
-        String unpaidDaysLabel = unpaidDays == 0
+        BigDecimal unpaidDays = p.getUnpaidDays() == null ? BigDecimal.ZERO : p.getUnpaidDays();
+        String unpaidDaysLabel = unpaidDays.signum() == 0
                 ? "None"
-                : unpaidDays + (unpaidDays == 1 ? " day" : " days");
+                : PayslipFormat.days(unpaidDays)
+                        + (unpaidDays.compareTo(BigDecimal.ONE) == 0 ? " day" : " days");
         return new PayslipResponse(
                 p.getId(),
                 p.getPeriod(),

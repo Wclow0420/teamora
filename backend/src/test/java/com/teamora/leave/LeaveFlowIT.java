@@ -8,7 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** End-to-end leave flow: an employee applies, an admin approves. */
+/**
+ * End-to-end leave flow: an employee applies, an admin approves. Mon 10 – Wed 12 Aug
+ * 2026 are all working days, so the working-day count matches the calendar span.
+ */
 class LeaveFlowIT extends AbstractIntegrationTest {
 
     @Test
@@ -22,6 +25,9 @@ class LeaveFlowIT extends AbstractIntegrationTest {
                         .contentType("application/json").content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"))
+                // No durationUnit in the body → FULL_DAY, for older clients.
+                .andExpect(jsonPath("$.durationUnit").value("FULL_DAY"))
+                .andExpect(jsonPath("$.halfDayPeriod").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.durationLabel").value("3 days"));
     }
 

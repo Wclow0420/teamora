@@ -15,8 +15,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,6 +28,7 @@ public class LeaveService {
     private final LeaveBalanceRepository balances;
     private final LeaveRequestRepository requests;
     private final LeaveTypeService leaveTypes;
+    private final LeaveDurationCalculator durations;
     private final ApprovalNotifier notifier;
 
     /** The signed-in employee's leave balances (whatever is on record). */
@@ -44,13 +45,17 @@ public class LeaveService {
                 .toList();
     }
 
-    /** Submit a new leave request (PENDING). Balance is only deducted on approval. */
+    /**
+     * Submit a new leave request (PENDING). Balance is only deducted on approval.
+     *
+     * <p>The day count is the <b>working-day fraction</b> resolved by
+     * {@link LeaveDurationCalculator} — full days skip rest days and public holidays,
+     * a half day is 0.50 and an hourly request is {@code hours / hoursPerDay}.
+     */
     @Transactional
     public LeaveRequestResponse apply(Employee employee, ApplyLeaveRequest req) {
-        if (req.endDate().isBefore(req.startDate())) {
-            throw new BadRequestException("End date cannot be before start date");
-        }
-        int days = inclusiveDays(req);
+        LeaveDurationCalculator.Duration duration = durations.resolve(
+                employee, req.unit(), req.startDate(), req.endDate(), req.halfDayPeriod(), req.hours());
 
         LeaveType type = leaveTypes.requireInCompany(employee.getCompany().getId(), req.leaveTypeId());
 
@@ -59,16 +64,22 @@ public class LeaveService {
                 .leaveType(type)
                 .startDate(req.startDate())
                 .endDate(req.endDate())
-                .days(days)
+                .days(duration.days())
+                .durationUnit(duration.unit())
+                .halfDayPeriod(duration.halfDayPeriod())
+                .hours(duration.hours())
+                .startTime(duration.unit() == LeaveDurationUnit.HOURS ? req.startTime() : null)
                 .reason(req.reason())
                 .status(LeaveStatus.PENDING)
                 .build();
         entity.setCompany(employee.getCompany());
 
         LeaveRequest saved = requests.save(entity);
+        LeaveRequestResponse response = LeaveRequestResponse.from(saved);
         notifier.notifyApprover(employee.getId(), employee.getCompany().getId(), NotificationType.APPROVAL_REQUEST,
-                "New leave request", employee.getFullName() + " requested " + type.label() + " (" + days + " day" + (days == 1 ? "" : "s") + ")");
-        return LeaveRequestResponse.from(saved);
+                "New leave request",
+                employee.getFullName() + " requested " + type.label() + " (" + response.durationLabel() + ")");
+        return response;
     }
 
     /**
@@ -94,8 +105,8 @@ public class LeaveService {
 
         balances.findByEmployeeIdAndLeaveTypeId(r.getEmployee().getId(), r.getLeaveType().getId())
                 .ifPresent(b -> {
-                    int used = b.getUsed() == null ? 0 : b.getUsed();
-                    b.setUsed(used + (r.getDays() == null ? 0 : r.getDays()));
+                    BigDecimal taken = r.getDays() == null ? BigDecimal.ZERO : r.getDays();
+                    b.setUsed(b.usedOrZero().add(taken));
                 });
         notifier.notifyRequester(r.getEmployee(), NotificationType.LEAVE_APPROVED,
                 "Leave approved", "Your " + r.getLeaveType().label() + " was approved.");
@@ -137,13 +148,9 @@ public class LeaveService {
         }
     }
 
-    private Integer remainingFor(LeaveRequest r) {
+    private BigDecimal remainingFor(LeaveRequest r) {
         return balances.findByEmployeeIdAndLeaveTypeId(r.getEmployee().getId(), r.getLeaveType().getId())
                 .map(LeaveBalance::remaining)
                 .orElse(null);
-    }
-
-    private int inclusiveDays(ApplyLeaveRequest req) {
-        return (int) (ChronoUnit.DAYS.between(req.startDate(), req.endDate()) + 1);
     }
 }

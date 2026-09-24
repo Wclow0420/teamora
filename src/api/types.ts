@@ -207,6 +207,11 @@ export type LiveAttendance = {
 };
 
 // ---- Leave ----
+/** How much of a working day a leave request consumes. */
+export type LeaveDurationUnit = 'FULL_DAY' | 'HALF_DAY' | 'HOURS';
+/** Which half of the day a HALF_DAY request covers. */
+export type HalfDayPeriod = 'AM' | 'PM';
+
 export type LeaveBalance = {
   /** FK to the configurable leave type + its display metadata. */
   leaveTypeId: string;
@@ -214,6 +219,7 @@ export type LeaveBalance = {
   name: string;
   colorKey: string;
   paid: boolean;
+  /** Fractional since partial-day leave — e.g. 12.5. Render via `formatDecimal`. */
   used: number;
   entitled: number;
   remaining: number;
@@ -226,7 +232,12 @@ export type LeaveRequest = {
   colorKey: string;
   paid: boolean;
   dateRangeLabel: string;
+  /** Human duration, e.g. "3 days", "Half day (AM)", "2 hours". */
   durationLabel: string;
+  durationUnit: LeaveDurationUnit;
+  halfDayPeriod: HalfDayPeriod | null;
+  /** Set only for HOURS requests, e.g. "2 hours". */
+  hoursLabel: string | null;
   reason: string | null;
   status: string;
   statusLabel: string;
@@ -241,11 +252,30 @@ export type PendingLeave = {
   paid: boolean;
   dateRangeLabel: string;
   durationLabel: string;
+  durationUnit: LeaveDurationUnit;
+  halfDayPeriod: HalfDayPeriod | null;
+  hoursLabel: string | null;
   reason: string | null;
   balanceLabel: string;
   accentColorKey: string;
 };
-export type ApplyLeaveBody = { leaveTypeId: string; startDate: string; endDate: string; reason?: string };
+/**
+ * HALF_DAY and HOURS apply to a single date — send `startDate === endDate`.
+ * `durationUnit` defaults to FULL_DAY server-side when omitted.
+ */
+export type ApplyLeaveBody = {
+  leaveTypeId: string;
+  startDate: string;
+  endDate: string;
+  durationUnit?: LeaveDurationUnit;
+  /** Required when `durationUnit` is HALF_DAY. */
+  halfDayPeriod?: HalfDayPeriod;
+  /** Required when `durationUnit` is HOURS — must be > 0 and <= the staff's hours/day. */
+  hours?: number;
+  /** Optional "HH:mm" start time, HOURS only. */
+  startTime?: string;
+  reason?: string;
+};
 
 // ---- Claims ----
 export type Claim = {

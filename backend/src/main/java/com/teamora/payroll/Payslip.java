@@ -84,10 +84,13 @@ public class Payslip extends TenantEntity {
 
     // ---- Compensation transparency (unpaid-leave deduction, derived rate) ----
 
-    /** Unpaid-leave days deducted from the basic this period. */
+    /**
+     * Unpaid-leave days deducted from the basic this period. Fractional since
+     * partial-day leave — a half day is 0.50, two hours of an eight-hour day 0.25.
+     */
     @Builder.Default
-    @Column(name = "unpaid_days", nullable = false)
-    private int unpaidDays = 0;
+    @Column(name = "unpaid_days", nullable = false, precision = 5, scale = 2)
+    private BigDecimal unpaidDays = BigDecimal.ZERO;
 
     /** Amount deducted for unpaid-leave days (informational; already reflected in {@code basic}). */
     @Builder.Default

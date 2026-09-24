@@ -29,6 +29,18 @@ public final class PayslipFormat {
         return MONEY.format(value == null ? BigDecimal.ZERO : value);
     }
 
+    /**
+     * Format a (possibly fractional) day count without trailing zeros:
+     * 2.00 → "2", 0.50 → "0.5". Null → "0".
+     */
+    public static String days(BigDecimal value) {
+        if (value == null) {
+            return "0";
+        }
+        BigDecimal stripped = value.stripTrailingZeros();
+        return (stripped.scale() < 0 ? stripped.setScale(0) : stripped).toPlainString();
+    }
+
     /** "2026-06" → "June 2026". Falls back to the raw period if it can't be parsed. */
     public static String periodLabel(String period) {
         if (period == null) {

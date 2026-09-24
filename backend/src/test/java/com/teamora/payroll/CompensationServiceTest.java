@@ -9,6 +9,8 @@ import com.teamora.company.CompanySettings;
 import com.teamora.company.CompanySettingsService;
 import com.teamora.employee.Employee;
 import com.teamora.employee.PayBasis;
+import com.teamora.leave.HalfDayPeriod;
+import com.teamora.leave.LeaveDurationUnit;
 import com.teamora.leave.LeaveRequest;
 import com.teamora.leave.LeaveStatus;
 import com.teamora.leave.LeaveType;
@@ -107,7 +109,7 @@ class CompensationServiceTest {
 
         CompensationService.Compensation c = service.forPeriod(employee("4000"), YearMonth.of(2026, 2));
 
-        assertThat(c.unpaidDays()).isZero();
+        assertThat(c.unpaidDays()).isEqualByComparingTo("0");
         assertThat(c.unpaidDeduction()).isEqualByComparingTo("0.00");
         assertThat(c.paidBasic()).isEqualByComparingTo("4000.00");
     }
@@ -124,7 +126,7 @@ class CompensationServiceTest {
 
         CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 2));
 
-        assertThat(c.unpaidDays()).isEqualTo(2);
+        assertThat(c.unpaidDays()).isEqualByComparingTo("2");
         assertThat(c.unpaidDeduction()).isEqualByComparingTo("400.00");
         assertThat(c.paidBasic()).isEqualByComparingTo("3600.00");
         assertThat(c.paidDays()).isEqualTo(18);
@@ -142,7 +144,7 @@ class CompensationServiceTest {
         CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 3));
 
         assertThat(c.scheduledWorkingDays()).isEqualTo(22);
-        assertThat(c.unpaidDays()).isEqualTo(1);
+        assertThat(c.unpaidDays()).isEqualByComparingTo("1");
         assertThat(c.unpaidDeduction()).isEqualByComparingTo("181.82");
         assertThat(c.paidBasic()).isEqualByComparingTo("3818.18");
     }
@@ -157,7 +159,67 @@ class CompensationServiceTest {
 
         CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 2));
 
-        assertThat(c.unpaidDays()).isZero();
+        assertThat(c.unpaidDays()).isEqualByComparingTo("0");
+        assertThat(c.paidBasic()).isEqualByComparingTo("4000.00");
+    }
+
+    @Test
+    void monthly_unpaidHalfDay_deductsExactlyHalfTheDailyRate() {
+        // Feb 2026: 20 scheduled days, RM4,000 → RM200/day. Half a day → RM100.00.
+        when(companySettings.resolve(any())).thenReturn(settings(PayBasis.MONTHLY, WorkWeek.MON_TO_FRI, "8.00"));
+        Employee e = employee("4000");
+        LeaveRequest half = halfDay(e, LocalDate.of(2026, 2, 2), false);
+        when(leaveRequests.findApprovedOverlapping(eq(e.getId()), eq(LeaveStatus.APPROVED), any(), any()))
+                .thenReturn(List.of(half));
+
+        CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 2));
+
+        assertThat(c.unpaidDays()).isEqualByComparingTo("0.50");
+        assertThat(c.unpaidDeduction()).isEqualByComparingTo("100.00");
+        assertThat(c.paidBasic()).isEqualByComparingTo("3900.00");
+    }
+
+    @Test
+    void monthly_unpaidTwoHours_deductsAQuarterOfTheDailyRate() {
+        // 2h of an 8h day = 0.25 day → RM200 × 0.25 = RM50.00.
+        when(companySettings.resolve(any())).thenReturn(settings(PayBasis.MONTHLY, WorkWeek.MON_TO_FRI, "8.00"));
+        Employee e = employee("4000");
+        LeaveRequest twoHours = hours(e, LocalDate.of(2026, 2, 2), "2.00", false);
+        when(leaveRequests.findApprovedOverlapping(eq(e.getId()), eq(LeaveStatus.APPROVED), any(), any()))
+                .thenReturn(List.of(twoHours));
+
+        CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 2));
+
+        assertThat(c.unpaidDays()).isEqualByComparingTo("0.25");
+        assertThat(c.unpaidDeduction()).isEqualByComparingTo("50.00");
+        assertThat(c.paidBasic()).isEqualByComparingTo("3950.00");
+    }
+
+    @Test
+    void monthly_unpaidLeaveOverAWeekend_onlyCountsWorkingDays() {
+        // Fri 6 → Mon 9 Feb 2026 is 4 calendar days but only 2 Mon–Fri working days.
+        when(companySettings.resolve(any())).thenReturn(settings(PayBasis.MONTHLY, WorkWeek.MON_TO_FRI, "8.00"));
+        Employee e = employee("4000");
+        LeaveRequest unpaid = approvedUnpaid(e, LocalDate.of(2026, 2, 6), LocalDate.of(2026, 2, 9));
+        when(leaveRequests.findApprovedOverlapping(eq(e.getId()), eq(LeaveStatus.APPROVED), any(), any()))
+                .thenReturn(List.of(unpaid));
+
+        CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 2));
+
+        assertThat(c.unpaidDays()).isEqualByComparingTo("2.00");
+        assertThat(c.unpaidDeduction()).isEqualByComparingTo("400.00");
+    }
+
+    @Test
+    void monthly_paidHalfDay_doesNotDeduct() {
+        when(companySettings.resolve(any())).thenReturn(settings(PayBasis.MONTHLY, WorkWeek.MON_TO_FRI, "8.00"));
+        Employee e = employee("4000");
+        when(leaveRequests.findApprovedOverlapping(eq(e.getId()), eq(LeaveStatus.APPROVED), any(), any()))
+                .thenReturn(List.of(halfDay(e, LocalDate.of(2026, 2, 2), true)));
+
+        CompensationService.Compensation c = service.forPeriod(e, YearMonth.of(2026, 2));
+
+        assertThat(c.unpaidDays()).isEqualByComparingTo("0");
         assertThat(c.paidBasic()).isEqualByComparingTo("4000.00");
     }
 
@@ -178,10 +240,26 @@ class CompensationServiceTest {
                 .leaveType(type)
                 .startDate(from)
                 .endDate(to)
-                .days((int) (to.toEpochDay() - from.toEpochDay() + 1))
+                .days(BigDecimal.valueOf(to.toEpochDay() - from.toEpochDay() + 1).setScale(2))
                 .status(LeaveStatus.APPROVED)
                 .build();
         r.setCompany(company);
+        return r;
+    }
+
+    private LeaveRequest halfDay(Employee e, LocalDate on, boolean paid) {
+        LeaveRequest r = approved(e, on, on, leaveType(paid ? "ANNUAL" : "UNPAID", paid));
+        r.setDurationUnit(LeaveDurationUnit.HALF_DAY);
+        r.setHalfDayPeriod(HalfDayPeriod.AM);
+        r.setDays(new BigDecimal("0.50"));
+        return r;
+    }
+
+    private LeaveRequest hours(Employee e, LocalDate on, String hrs, boolean paid) {
+        LeaveRequest r = approved(e, on, on, leaveType(paid ? "ANNUAL" : "UNPAID", paid));
+        r.setDurationUnit(LeaveDurationUnit.HOURS);
+        r.setHours(new BigDecimal(hrs));
+        r.setDays(new BigDecimal(hrs).divide(new BigDecimal("8.00"), 2, java.math.RoundingMode.HALF_UP));
         return r;
     }
 

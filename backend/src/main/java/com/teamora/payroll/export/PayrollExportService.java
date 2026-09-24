@@ -204,7 +204,7 @@ public class PayrollExportService {
                     PayslipFormat.money(p.getGross()), PayslipFormat.money(p.getEpf()),
                     PayslipFormat.money(p.getSocso()), PayslipFormat.money(p.getEis()),
                     PayslipFormat.money(p.getPcb()), PayslipFormat.money(p.getDeductions()),
-                    PayslipFormat.money(p.getNet()), Integer.toString(p.getUnpaidDays()),
+                    PayslipFormat.money(p.getNet()), PayslipFormat.days(p.getUnpaidDays()),
                     PayslipFormat.money(p.getUnpaidDeduction())));
         }
         return CsvUtil.document(rows);

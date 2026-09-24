@@ -11,6 +11,8 @@ import com.teamora.company.CompanySettings;
 import com.teamora.company.CompanySettingsService;
 import com.teamora.employee.Employee;
 import com.teamora.employee.PayBasis;
+import com.teamora.leave.LeaveDurationCalculator;
+import com.teamora.leave.LeaveDurationUnit;
 import com.teamora.leave.LeaveRequest;
 import com.teamora.leave.LeaveRequestRepository;
 import com.teamora.leave.LeaveStatus;
@@ -22,8 +24,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -47,6 +51,9 @@ public class CompensationService {
 
     private static final int RATE_SCALE = 8; // internal precision before the final money round
     private static final int MONEY_SCALE = 2;
+    private static final int DAY_SCALE = 2;  // leave day fractions (0.50, 0.25, …)
+    private static final BigDecimal FULL_DAY = BigDecimal.ONE.setScale(DAY_SCALE);
+    private static final BigDecimal HALF_DAY = new BigDecimal("0.50");
 
     private static final Set<AttendanceStatus> PRESENT = Set.of(
             AttendanceStatus.PRESENT, AttendanceStatus.LATE,
@@ -76,7 +83,7 @@ public class CompensationService {
             int scheduledWorkingDays,
             BigDecimal dailyRate,        // money-scaled
             BigDecimal hourlyRate,       // money-scaled
-            int unpaidDays,
+            BigDecimal unpaidDays,       // day-scaled fraction (2dp) — half days and hours count as part days
             BigDecimal unpaidDeduction,  // money-scaled
             Integer paidDays,            // null for HOURLY
             BigDecimal paidBasic         // money-scaled — feeds PayrollCalculator
@@ -123,12 +130,18 @@ public class CompensationService {
             holidays.add(ev.getEventDate());
         }
 
-        // Approved leave overlapping the period → classify scheduled working days.
-        Set<LocalDate> unpaidLeaveDates = new HashSet<>();
-        Set<LocalDate> paidLeaveDates = new HashSet<>();
+        // Approved leave overlapping the period → accumulate the working-day FRACTION
+        // each request consumes, per date. Partial-day leave (half day / hours) costs a
+        // fraction of a day, so this can't be a whole-day count any more.
+        Map<LocalDate, BigDecimal> unpaidByDate = new HashMap<>();
+        Map<LocalDate, BigDecimal> paidByDate = new HashMap<>();
         for (LeaveRequest r : leaveRequests.findApprovedOverlapping(
                 e.getId(), LeaveStatus.APPROVED, monthStart, monthEnd)) {
             boolean paid = r.getLeaveType().isPaid();
+            BigDecimal fraction = dayFraction(r, hoursPerDay);
+            if (fraction.signum() <= 0) {
+                continue;
+            }
             LocalDate from = r.getStartDate().isBefore(monthStart) ? monthStart : r.getStartDate();
             LocalDate to = r.getEndDate().isAfter(monthEnd) ? monthEnd : r.getEndDate();
             for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
@@ -138,14 +151,14 @@ public class CompensationService {
                 if (holidays.contains(d)) {
                     continue; // holiday is paid regardless; excluded from unpaid deduction
                 }
-                if (paid) {
-                    paidLeaveDates.add(d);
-                } else {
-                    unpaidLeaveDates.add(d);
-                }
+                // A single date can never cost more than one day of pay, however many
+                // overlapping requests land on it.
+                (paid ? paidByDate : unpaidByDate).merge(d, fraction,
+                        (a, b2) -> a.add(b2).min(FULL_DAY));
             }
         }
-        int unpaidDays = unpaidLeaveDates.size();
+        BigDecimal unpaidDays = sum(unpaidByDate);
+        BigDecimal paidLeaveDays = sum(paidByDate);
 
         // Attendance in the period (present days + worked minutes).
         int presentDays = 0;
@@ -174,21 +187,23 @@ public class CompensationService {
 
         switch (schedule.payBasis()) {
             case DAILY -> {
-                int paidWorkedDays = presentDays + paidLeaveDates.size() + holidaysOnWorkingDays;
-                paidBasic = money(dailyExact.multiply(BigDecimal.valueOf(paidWorkedDays)));
-                paidDays = paidWorkedDays;
+                BigDecimal paidWorkedDays = BigDecimal.valueOf(presentDays)
+                        .add(paidLeaveDays)
+                        .add(BigDecimal.valueOf(holidaysOnWorkingDays));
+                paidBasic = money(dailyExact.multiply(paidWorkedDays));
+                paidDays = wholeDays(paidWorkedDays);
             }
             case HOURLY -> {
                 BigDecimal paidHours = workedHours
-                        .add(BigDecimal.valueOf(paidLeaveDates.size()).multiply(hoursPerDay))
+                        .add(paidLeaveDays.multiply(hoursPerDay))
                         .add(BigDecimal.valueOf(holidaysOnWorkingDays).multiply(hoursPerDay));
                 paidBasic = money(hourlyExact.multiply(paidHours));
                 paidDays = null;
             }
             default -> { // MONTHLY
-                unpaidDeduction = money(dailyExact.multiply(BigDecimal.valueOf(unpaidDays)));
+                unpaidDeduction = money(dailyExact.multiply(unpaidDays));
                 paidBasic = money(monthlySalary.subtract(unpaidDeduction));
-                paidDays = Math.max(0, scheduledDays - unpaidDays);
+                paidDays = Math.max(0, wholeDays(BigDecimal.valueOf(scheduledDays).subtract(unpaidDays)));
             }
         }
 
@@ -199,6 +214,36 @@ public class CompensationService {
     }
 
     // ---------------- helpers ----------------
+
+    /**
+     * The working-day fraction one approved leave request costs per qualifying date:
+     * a full day is 1.00, a half day 0.50 and an hourly request {@code hours / hoursPerDay}
+     * (the same 2dp fraction {@link LeaveDurationCalculator} recorded when it was applied
+     * for, so the balance deduction and the pay deduction can never disagree).
+     */
+    private static BigDecimal dayFraction(LeaveRequest r, BigDecimal hoursPerDay) {
+        LeaveDurationUnit unit = r.getDurationUnit() == null ? LeaveDurationUnit.FULL_DAY : r.getDurationUnit();
+        return switch (unit) {
+            case HALF_DAY -> HALF_DAY;
+            case HOURS -> r.getHours() != null
+                    ? LeaveDurationCalculator.hourFraction(r.getHours(), hoursPerDay)
+                    : nz(r.getDays()).setScale(DAY_SCALE, RoundingMode.HALF_UP);
+            default -> FULL_DAY;
+        };
+    }
+
+    private static BigDecimal sum(Map<LocalDate, BigDecimal> byDate) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (BigDecimal v : byDate.values()) {
+            total = total.add(v);
+        }
+        return total.setScale(DAY_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /** Payslip day counts are whole numbers; the exact money uses the fraction above. */
+    private static int wholeDays(BigDecimal v) {
+        return v.setScale(0, RoundingMode.HALF_UP).intValue();
+    }
 
     private static BigDecimal dailyRateExact(BigDecimal monthlySalary, int scheduledDays) {
         BigDecimal salary = nz(monthlySalary);

@@ -18,6 +18,7 @@ export { SelectChips } from './SelectChips';
 export type { SelectOption } from './SelectChips';
 export { WeekdayToggles } from './WeekdayToggles';
 export { DateField, toISODate } from './DateField';
+export { TimeField, toHHMM } from './TimeField';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
 export { HeroCard } from './HeroCard';

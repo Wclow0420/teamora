@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, type TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
@@ -7,7 +7,11 @@ import { Button, Card, Chip, EmptyState, IconTile, ProgressBar, ScreenHeader } f
 import { useLeaveBalances, useLeaveRequests } from '@/api/queries';
 import { accentFromKey, statusAccent } from '@/api/accents';
 import type { LeaveBalance } from '@/api/types';
+import { formatDecimal } from '@/lib/numbers';
 import { palette, font, radius, tint } from '@/theme';
+
+/** Balances are fractional now — keep the digits aligned. */
+const NUM: TextStyle = { fontVariant: ['tabular-nums'] };
 
 function balanceColor(b: LeaveBalance): string {
   return accentFromKey(b.colorKey).color;
@@ -47,8 +51,10 @@ export default function Leave() {
                 return (
                   <Card key={b.leaveTypeId ?? b.code} padding={0} elevated={false} style={{ flex: 1, borderRadius: radius.xl, padding: 13, paddingTop: 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
-                      <Text style={[font(800), { fontSize: 24, color }]}>{b.remaining}</Text>
-                      <Text style={[font(600), { fontSize: 11, color: palette.faint, marginBottom: 3 }]}>/{b.entitled}</Text>
+                      <Text style={[font(800), { fontSize: 24, color }, NUM]}>{formatDecimal(b.remaining)}</Text>
+                      <Text style={[font(600), { fontSize: 11, color: palette.faint, marginBottom: 3 }, NUM]}>
+                        /{formatDecimal(b.entitled)}
+                      </Text>
                     </View>
                     <Text style={[font(600), { fontSize: 11, color: palette.soft, marginTop: 8 }]}>{b.name}</Text>
                     <ProgressBar value={used} color={color} />
