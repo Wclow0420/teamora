@@ -100,11 +100,14 @@ public class LeaveSeeder implements CommandLineRunner {
                 .orElseThrow(() -> new IllegalStateException("Missing seeded leave type " + code + " for company " + companyId));
     }
 
+    /** Demo balances belong to the leave year we are in today (the demo company starts in January). */
     private LeaveBalance balance(Employee e, LeaveType type, String entitled, String used) {
         LeaveBalance b = LeaveBalance.builder()
                 .employee(e)
                 .leaveType(type)
+                .leaveYear(LeaveYear.yearOf(LocalDate.now(), LeaveYear.DEFAULT_START_MONTH))
                 .entitled(new BigDecimal(entitled).setScale(2))
+                .carriedForward(BigDecimal.ZERO.setScale(2))
                 .used(new BigDecimal(used).setScale(2))
                 .build();
         b.setCompany(e.getCompany());

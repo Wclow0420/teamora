@@ -39,6 +39,14 @@ function parseDays(text: string): number | undefined {
   return Number.isInteger(n) && n >= 0 ? n : undefined;
 }
 
+/** Carry-forward cap — fractional days allowed (half days exist), blank = 0. */
+function parseCapDays(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 export default function LeaveTypeEdit() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -48,6 +56,7 @@ export default function LeaveTypeEdit() {
     paid?: string;
     defaultEntitlementDays?: string;
     accrual?: string;
+    carryForwardMaxDays?: string;
     colorKey?: string;
     active?: string;
   }>();
@@ -63,6 +72,7 @@ export default function LeaveTypeEdit() {
   const [accrual, setAccrual] = useState<LeaveAccrual>(
     params.accrual === 'MONTHLY_ACCRUAL' || params.accrual === 'NONE' ? params.accrual : 'FIXED_ANNUAL',
   );
+  const [carryForward, setCarryForward] = useState(params.carryForwardMaxDays ?? '');
   const [colorKey, setColorKey] = useState<string>(params.colorKey ?? 'coral');
   const [active, setActive] = useState<'ACTIVE' | 'INACTIVE'>(params.active === 'false' ? 'INACTIVE' : 'ACTIVE');
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +90,11 @@ export default function LeaveTypeEdit() {
       setError('Enter a valid number of entitlement days.');
       return;
     }
+    const carryForwardMaxDays = parseCapDays(carryForward);
+    if (carryForwardMaxDays === undefined) {
+      setError('Enter a valid carry-forward cap (0 or more days).');
+      return;
+    }
     try {
       if (isEdit && params.id) {
         await update.mutateAsync({
@@ -89,6 +104,7 @@ export default function LeaveTypeEdit() {
             paid: paid === 'PAID',
             defaultEntitlementDays: entitlement,
             accrual,
+            carryForwardMaxDays,
             colorKey,
             active: active === 'ACTIVE',
           },
@@ -105,6 +121,7 @@ export default function LeaveTypeEdit() {
           paid: paid === 'PAID',
           defaultEntitlementDays: entitlement,
           accrual,
+          carryForwardMaxDays,
           colorKey,
         });
       }
@@ -148,6 +165,16 @@ export default function LeaveTypeEdit() {
           placeholder="e.g. 16"
         />
         <SelectChips label="Accrual" options={ACCRUAL_OPTIONS} value={accrual} onChange={setAccrual} />
+        <TextField
+          label="Carry-forward cap (days)"
+          value={carryForward}
+          onChangeText={setCarryForward}
+          keyboardType="decimal-pad"
+          placeholder="e.g. 5"
+        />
+        <Text style={[font(500), { fontSize: 11.5, color: palette.soft, marginTop: -8, lineHeight: 16 }]}>
+          0 = unused days are forfeited at year end.
+        </Text>
 
         {/* colour picker */}
         <View>

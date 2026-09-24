@@ -28,6 +28,8 @@ public final class EmployeeDtos {
             String department,
             String staffId,
             String phone,
+            /** First day of employment — drives first-year leave proration. */
+            java.time.LocalDate joinDate,
             UUID reportingManagerId,
             UUID workLocationId,
             @PositiveOrZero BigDecimal monthlySalary,
@@ -55,6 +57,8 @@ public final class EmployeeDtos {
             String department,
             String phone,
             String staffId,
+            /** First day of employment — drives first-year leave proration. */
+            java.time.LocalDate joinDate,
             Role role,
             UUID reportingManagerId,
             UUID workLocationId,

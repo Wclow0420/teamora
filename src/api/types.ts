@@ -26,6 +26,8 @@ export type LeaveTypeDef = {
   paid: boolean;
   defaultEntitlementDays: number;
   accrual: LeaveAccrual;
+  /** Max unused days carried into the next leave year. 0 = forfeited at year end. */
+  carryForwardMaxDays: number;
   colorKey: string;
   active: boolean;
   sortOrder: number;
@@ -37,11 +39,14 @@ export type CompanySettings = {
   /** Working-weekday bitmask: bit0=Mon … bit6=Sun. Mon–Fri = 31, full week = 127. */
   defaultWorkingDays: number;
   defaultHoursPerDay: number;
+  /** Month (1–12) the company's leave year begins. 1 = calendar year. */
+  leaveYearStartMonth: number;
 };
 export type UpdateCompanySettingsBody = {
   defaultPayBasis?: PayBasis;
   defaultWorkingDays?: number;
   defaultHoursPerDay?: number;
+  leaveYearStartMonth?: number;
 };
 
 export type CreateLeaveTypeBody = {
@@ -50,6 +55,7 @@ export type CreateLeaveTypeBody = {
   paid: boolean;
   defaultEntitlementDays: number;
   accrual?: LeaveAccrual;
+  carryForwardMaxDays?: number;
   colorKey: string;
   sortOrder?: number;
 };
@@ -58,6 +64,7 @@ export type UpdateLeaveTypeBody = {
   paid?: boolean;
   defaultEntitlementDays?: number;
   accrual?: LeaveAccrual;
+  carryForwardMaxDays?: number;
   colorKey?: string;
   active?: boolean;
   sortOrder?: number;
@@ -219,10 +226,32 @@ export type LeaveBalance = {
   name: string;
   colorKey: string;
   paid: boolean;
+  /** The leave year this row belongs to, named by its starting calendar year. */
+  leaveYear: number;
   /** Fractional since partial-day leave — e.g. 12.5. Render via `formatDecimal`. */
   used: number;
+  /** Full-year entitlement (already prorated for a first-year joiner). */
   entitled: number;
+  /**
+   * How much of `entitled` has accrued so far. Equals `entitled` for
+   * FIXED_ANNUAL types; grows month by month for MONTHLY_ACCRUAL ones.
+   */
+  accruedToDate: number;
+  /** Unused days brought in from the previous leave year (capped per type). */
+  carriedForward: number;
+  /** Available to take now = accruedToDate + carriedForward − used. */
   remaining: number;
+};
+
+/**
+ * Admin entitlement override. `leaveYear` defaults to the current leave year
+ * server-side when omitted.
+ */
+export type OverrideLeaveEntitlementBody = {
+  employeeId: string;
+  leaveTypeId: string;
+  leaveYear?: number;
+  entitled: number;
 };
 export type LeaveRequest = {
   id: string;

@@ -17,6 +17,26 @@ function balanceColor(b: LeaveBalance): string {
   return accentFromKey(b.colorKey).color;
 }
 
+/** A number the API may not have sent yet (older backend) → 0. */
+function num(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * The small line under a balance tile — shown only when it adds something.
+ * Carried-over days are surfaced whenever there are any; "accrued so far" only
+ * for types that drip through the year (accrued still short of the full-year
+ * entitlement). Both absent → no sub-line, no clutter.
+ */
+function balanceNote(b: LeaveBalance): string | null {
+  const accrued = num(b.accruedToDate);
+  const carried = num(b.carriedForward);
+  const parts: string[] = [];
+  if (accrued < num(b.entitled)) parts.push(`${formatDecimal(accrued)} accrued so far`);
+  if (carried > 0) parts.push(`${formatDecimal(carried)} carried over`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
 export default function Leave() {
   const router = useRouter();
   const balances = useLeaveBalances();
@@ -47,7 +67,10 @@ export default function Leave() {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {balances.data.map((b) => {
                 const color = balanceColor(b);
-                const used = b.entitled > 0 ? (b.entitled - b.remaining) / b.entitled : 0;
+                // The pool is the full-year entitlement plus anything carried in.
+                const pool = num(b.entitled) + num(b.carriedForward);
+                const used = pool > 0 ? (pool - b.remaining) / pool : 0;
+                const note = balanceNote(b);
                 return (
                   <Card key={b.leaveTypeId ?? b.code} padding={0} elevated={false} style={{ flex: 1, borderRadius: radius.xl, padding: 13, paddingTop: 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
@@ -58,6 +81,11 @@ export default function Leave() {
                     </View>
                     <Text style={[font(600), { fontSize: 11, color: palette.soft, marginTop: 8 }]}>{b.name}</Text>
                     <ProgressBar value={used} color={color} />
+                    {note && (
+                      <Text style={[font(500), { fontSize: 10, color: palette.faint, marginTop: 6, lineHeight: 13 }, NUM]}>
+                        {note}
+                      </Text>
+                    )}
                   </Card>
                 );
               })}

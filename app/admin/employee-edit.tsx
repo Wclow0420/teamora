@@ -7,6 +7,7 @@ import { ReportingManagerField } from '@/components/ReportingManagerField';
 import { WorkLocationField } from '@/components/WorkLocationField';
 import { CompensationFields } from '@/components/CompensationFields';
 import { StatutoryBankFields } from '@/components/StatutoryBankFields';
+import { LeaveEntitlementFields } from '@/components/LeaveEntitlementFields';
 import { useCompanySettings, useEmployee, useMe, useTransferOwnership, useUpdateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
 import type { MaritalStatus, PayBasis, Role } from '@/api/types';
@@ -316,6 +317,8 @@ export default function EmployeeEdit() {
           bankAccountNo={bankAccountNo}
           onBankAccountNo={setBankAccountNo}
         />
+
+        <LeaveEntitlementFields employeeId={params.id} />
 
         {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
       </View>

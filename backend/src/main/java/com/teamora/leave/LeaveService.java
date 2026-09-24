@@ -25,17 +25,20 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class LeaveService {
 
-    private final LeaveBalanceRepository balances;
+    private final LeaveBalanceService leaveBalances;
     private final LeaveRequestRepository requests;
     private final LeaveTypeService leaveTypes;
     private final LeaveDurationCalculator durations;
     private final ApprovalNotifier notifier;
 
-    /** The signed-in employee's leave balances (whatever is on record). */
-    public List<LeaveBalanceResponse> myBalances(Employee employee) {
-        return balances.findByEmployeeId(employee.getId()).stream()
-                .map(LeaveBalanceResponse::from)
-                .toList();
+    /**
+     * The signed-in employee's leave balances for {@code year} — the current leave
+     * year when omitted. Missing rows are provisioned lazily (see
+     * {@link LeaveBalanceService#ensureBalances}).
+     */
+    @Transactional
+    public List<LeaveBalanceResponse> myBalances(Employee employee, Integer year) {
+        return leaveBalances.balancesFor(employee, year);
     }
 
     /** The signed-in employee's leave requests, newest first. */
@@ -103,11 +106,12 @@ public class LeaveService {
         r.setDecidedBy(admin);
         r.setDecidedAt(Instant.now());
 
-        balances.findByEmployeeIdAndLeaveTypeId(r.getEmployee().getId(), r.getLeaveType().getId())
-                .ifPresent(b -> {
-                    BigDecimal taken = r.getDays() == null ? BigDecimal.ZERO : r.getDays();
-                    b.setUsed(b.usedOrZero().add(taken));
-                });
+        // Charge the leave year the request STARTS in — leave booked in December for
+        // January comes out of next year's entitlement, not this year's.
+        int leaveYear = leaveBalances.leaveYearOf(r.getCompany(), r.getStartDate());
+        LeaveBalance balance = leaveBalances.ensureBalance(r.getEmployee(), r.getLeaveType(), leaveYear);
+        BigDecimal taken = r.getDays() == null ? BigDecimal.ZERO : r.getDays();
+        balance.setUsed(balance.usedOrZero().add(taken));
         notifier.notifyRequester(r.getEmployee(), NotificationType.LEAVE_APPROVED,
                 "Leave approved", "Your " + r.getLeaveType().label() + " was approved.");
     }
@@ -148,9 +152,8 @@ public class LeaveService {
         }
     }
 
+    /** Days available in the leave year the request falls in, or null when nothing is on record. */
     private BigDecimal remainingFor(LeaveRequest r) {
-        return balances.findByEmployeeIdAndLeaveTypeId(r.getEmployee().getId(), r.getLeaveType().getId())
-                .map(LeaveBalance::remaining)
-                .orElse(null);
+        return leaveBalances.availableOn(r.getEmployee(), r.getLeaveType().getId(), r.getStartDate());
     }
 }

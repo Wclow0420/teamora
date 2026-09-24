@@ -21,9 +21,10 @@ public class LeaveController {
 
     // ---------- Staff ----------
 
+    /** Balances for {@code year} (a leave year's starting calendar year); defaults to the current one. */
     @GetMapping("/api/leave/balances")
-    public List<LeaveBalanceResponse> balances() {
-        return leaveService.myBalances(currentEmployee.require());
+    public List<LeaveBalanceResponse> balances(@RequestParam(required = false) Integer year) {
+        return leaveService.myBalances(currentEmployee.require(), year);
     }
 
     @GetMapping("/api/leave/requests")

@@ -81,6 +81,7 @@ public class EmployeeService {
                 .department(req.department())
                 .staffId(req.staffId())
                 .phone(req.phone())
+                .joinDate(req.joinDate())
                 .monthlySalary(req.monthlySalary())
                 .maritalStatus(req.maritalStatus())
                 .spouseWorking(req.spouseWorking())
@@ -127,6 +128,7 @@ public class EmployeeService {
         if (req.department() != null) e.setDepartment(req.department().isBlank() ? null : req.department().trim());
         if (req.phone() != null) e.setPhone(req.phone().isBlank() ? null : req.phone().trim());
         if (req.staffId() != null) e.setStaffId(req.staffId().isBlank() ? null : req.staffId().trim());
+        if (req.joinDate() != null) e.setJoinDate(req.joinDate());
         if (req.monthlySalary() != null) e.setMonthlySalary(req.monthlySalary());
         if (req.maritalStatus() != null) e.setMaritalStatus(req.maritalStatus());
         if (req.spouseWorking() != null) e.setSpouseWorking(req.spouseWorking());

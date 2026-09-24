@@ -46,6 +46,9 @@ public class CompanySettingsService {
         if (req.defaultHoursPerDay() != null) {
             s.setDefaultHoursPerDay(req.defaultHoursPerDay());
         }
+        if (req.leaveYearStartMonth() != null) {
+            s.setLeaveYearStartMonth(req.leaveYearStartMonth());
+        }
         return s;
     }
 }

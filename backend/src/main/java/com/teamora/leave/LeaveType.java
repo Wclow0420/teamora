@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -44,6 +45,13 @@ public class LeaveType extends TenantEntity {
     @Column(name = "default_entitlement_days", nullable = false)
     private int defaultEntitlementDays;
 
+    /**
+     * Cap on unused days rolled into the next leave year; {@code 0} means unused
+     * days are forfeited at year end.
+     */
+    @Column(name = "carry_forward_max_days", nullable = false, precision = 5, scale = 2)
+    private BigDecimal carryForwardMaxDays;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private LeaveAccrual accrual;
@@ -57,6 +65,12 @@ public class LeaveType extends TenantEntity {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+
+    /** Carry-forward cap, never null, at 2dp. */
+    public BigDecimal carryForwardMaxDaysOrZero() {
+        return (carryForwardMaxDays == null ? BigDecimal.ZERO : carryForwardMaxDays)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+    }
 
     /** Human-friendly full label for the UI (currently the name). */
     public String label() {

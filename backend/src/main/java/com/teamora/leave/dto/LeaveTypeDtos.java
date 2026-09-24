@@ -2,6 +2,7 @@ package com.teamora.leave.dto;
 
 import com.teamora.leave.LeaveAccrual;
 import com.teamora.leave.LeaveType;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -18,6 +19,7 @@ public final class LeaveTypeDtos {
             boolean paid,
             int defaultEntitlementDays,
             LeaveAccrual accrual,
+            java.math.BigDecimal carryForwardMaxDays,
             String colorKey,
             boolean active,
             int sortOrder
@@ -25,8 +27,8 @@ public final class LeaveTypeDtos {
         public static LeaveTypeResponse from(LeaveType t) {
             return new LeaveTypeResponse(
                     t.getId(), t.getName(), t.getCode(), t.isPaid(),
-                    t.getDefaultEntitlementDays(), t.getAccrual(), t.getColorKey(),
-                    t.isActive(), t.getSortOrder());
+                    t.getDefaultEntitlementDays(), t.getAccrual(), t.carryForwardMaxDaysOrZero(),
+                    t.getColorKey(), t.isActive(), t.getSortOrder());
         }
     }
 
@@ -37,6 +39,7 @@ public final class LeaveTypeDtos {
             Boolean paid,
             @PositiveOrZero Integer defaultEntitlementDays,
             LeaveAccrual accrual,
+            @PositiveOrZero @DecimalMax("999.99") java.math.BigDecimal carryForwardMaxDays,
             @Size(max = 16) String colorKey,
             Boolean active,
             Integer sortOrder
@@ -48,6 +51,7 @@ public final class LeaveTypeDtos {
             Boolean paid,
             @PositiveOrZero Integer defaultEntitlementDays,
             LeaveAccrual accrual,
+            @PositiveOrZero @DecimalMax("999.99") java.math.BigDecimal carryForwardMaxDays,
             @Size(max = 16) String colorKey,
             Boolean active,
             Integer sortOrder

@@ -26,6 +26,7 @@ import {
   LiveAttendance,
   MonthCalendar,
   NotificationList,
+  OverrideLeaveEntitlementBody,
   WeekSchedule,
   AssignShiftBody,
   ShiftRow,
@@ -121,12 +122,25 @@ export const workLocationApi = {
 };
 
 export const leaveApi = {
-  balances: () => api.get<LeaveBalance[]>('/api/leave/balances'),
+  /** My balances. `year` names a leave year by its starting calendar year; omit for the current one. */
+  balances: (year?: number) =>
+    api.get<LeaveBalance[]>(`/api/leave/balances${year != null ? `?year=${year}` : ''}`),
   requests: () => api.get<LeaveRequest[]>('/api/leave/requests'),
   apply: (body: ApplyLeaveBody) => api.post<LeaveRequest>('/api/leave/requests', body),
   pending: () => api.get<PendingLeave[]>('/api/admin/leave/requests?status=PENDING'),
   approve: (id: string) => api.post<void>(`/api/admin/leave/requests/${id}/approve`),
   reject: (id: string) => api.post<void>(`/api/admin/leave/requests/${id}/reject`),
+};
+
+/** Admin view of a single employee's leave balances + entitlement overrides. */
+export const leaveBalanceAdminApi = {
+  list: (employeeId: string, year?: number) => {
+    const params = new URLSearchParams({ employeeId });
+    if (year != null) params.set('year', String(year));
+    return api.get<LeaveBalance[]>(`/api/admin/leave/balances?${params.toString()}`);
+  },
+  override: (body: OverrideLeaveEntitlementBody) =>
+    api.patch<LeaveBalance>('/api/admin/leave/balances', body),
 };
 
 export const claimApi = {

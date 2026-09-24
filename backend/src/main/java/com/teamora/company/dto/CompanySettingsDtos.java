@@ -17,13 +17,15 @@ public final class CompanySettingsDtos {
     public record CompanySettingsResponse(
             PayBasis defaultPayBasis,
             int defaultWorkingDays,
-            BigDecimal defaultHoursPerDay
+            BigDecimal defaultHoursPerDay,
+            int leaveYearStartMonth
     ) {
         public static CompanySettingsResponse from(CompanySettings s) {
             return new CompanySettingsResponse(
                     s.getDefaultPayBasis(),
                     s.getDefaultWorkingDays(),
-                    s.getDefaultHoursPerDay());
+                    s.getDefaultHoursPerDay(),
+                    s.getLeaveYearStartMonth());
         }
     }
 
@@ -31,6 +33,8 @@ public final class CompanySettingsDtos {
     public record UpdateCompanySettingsRequest(
             PayBasis defaultPayBasis,
             @Min(0) @Max(127) Integer defaultWorkingDays,
-            @DecimalMin("0.5") @DecimalMax("24.0") BigDecimal defaultHoursPerDay
+            @DecimalMin("0.5") @DecimalMax("24.0") BigDecimal defaultHoursPerDay,
+            /** Calendar month the leave year starts on (1 = January = calendar year). */
+            @Min(1) @Max(12) Integer leaveYearStartMonth
     ) {}
 }

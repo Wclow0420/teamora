@@ -35,6 +35,20 @@ const PAY_BASIS_OPTIONS: SelectOption<PayBasis>[] = [
   { value: 'HOURLY', label: 'Hourly' },
 ];
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/** Month chips 1–12 — SelectChips is string-valued, so the value is the month number as text. */
+const LEAVE_YEAR_MONTH_OPTIONS: SelectOption<string>[] = MONTH_LABELS.map((label, i) => ({
+  value: String(i + 1),
+  label,
+}));
+
+/** Coerce a stored month to 1–12, defaulting to January. */
+function safeMonth(value: number | undefined): number {
+  if (value == null || !Number.isInteger(value) || value < 1 || value > 12) return 1;
+  return value;
+}
+
 export default function CompanySettings() {
   const company = useCompany();
   const settings = useCompanySettings();
@@ -52,7 +66,7 @@ export default function CompanySettings() {
       </AsyncBoundary>
 
       <View style={{ marginTop: 24 }}>
-        <SectionLabel title="Payroll defaults" />
+        <SectionLabel title="Payroll & leave defaults" />
       </View>
       <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginBottom: 12, lineHeight: 16 }]}>
         Applied to new staff. Each employee can override these on their profile.
@@ -127,6 +141,7 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
   const [payBasis, setPayBasis] = useState<PayBasis>(settings.defaultPayBasis);
   const [workingDays, setWorkingDays] = useState<number>(settings.defaultWorkingDays);
   const [hoursPerDay, setHoursPerDay] = useState(String(settings.defaultHoursPerDay));
+  const [leaveYearStartMonth, setLeaveYearStartMonth] = useState(String(safeMonth(settings.leaveYearStartMonth)));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -143,6 +158,7 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
         defaultPayBasis: payBasis,
         defaultWorkingDays: workingDays,
         defaultHoursPerDay: hours,
+        leaveYearStartMonth: Number(leaveYearStartMonth),
       });
       setSaved(true);
     } catch (e) {
@@ -162,9 +178,18 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
         keyboardType="decimal-pad"
         placeholder="e.g. 8"
       />
+      <SelectChips
+        label="Leave year starts"
+        options={LEAVE_YEAR_MONTH_OPTIONS}
+        value={leaveYearStartMonth}
+        onChange={setLeaveYearStartMonth}
+      />
+      <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8, lineHeight: 16 }]}>
+        January = calendar year. Entitlement, accrual and carry-forward all follow this month.
+      </Text>
 
       {error && <Text style={{ color: palette.danger, fontSize: 12.5 }}>{error}</Text>}
-      {saved && !error && <Text style={{ color: palette.sage, fontSize: 12.5 }}>Payroll defaults saved.</Text>}
+      {saved && !error && <Text style={{ color: palette.sage, fontSize: 12.5 }}>Defaults saved.</Text>}
 
       <Button
         label={update.isPending ? 'Saving…' : 'Save defaults'}
@@ -188,6 +213,7 @@ function LeaveTypesManager({ types }: { types: LeaveTypeDef[] }) {
         paid: String(t.paid),
         defaultEntitlementDays: String(t.defaultEntitlementDays),
         accrual: t.accrual,
+        carryForwardMaxDays: String(t.carryForwardMaxDays ?? 0),
         colorKey: t.colorKey,
         active: String(t.active),
       },

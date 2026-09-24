@@ -20,7 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * dates, so nothing here can disturb the seeded demo data or any payroll period other
  * tests assert on. The one exception is the balance test, which needs an employee who
  * actually has a leave balance on record (only the demo seed creates those) — it asserts
- * a <em>delta</em> so it stays correct however many other tests touch Amir's leave.
+ * a <em>delta</em> so it stays correct however many other tests touch Amir's leave, against the
+ * 2027 leave year (leave is charged to the year its start date falls in).
  */
 class PartialLeaveIT extends AbstractIntegrationTest {
 
@@ -75,7 +76,8 @@ class PartialLeaveIT extends AbstractIntegrationTest {
         // Amir is the only fixture with a real leave balance on record.
         String amir = login("amir@lumi.com", "password");
         String annual = leaveTypeId(amir, "ANNUAL");
-        BigDecimal before = annualUsed(amir);
+        // The request is dated in leave year 2027, so that is the row it charges.
+        BigDecimal before = annualUsed(amir, 2027);
 
         var applied = mvc.perform(post("/api/leave/requests").header("Authorization", bearer(amir))
                         .contentType("application/json")
@@ -92,7 +94,7 @@ class PartialLeaveIT extends AbstractIntegrationTest {
         mvc.perform(post("/api/admin/leave/requests/" + id + "/approve").header("Authorization", bearer(sarah)))
                 .andExpect(status().isOk());
 
-        assertThat(annualUsed(amir)).isEqualByComparingTo(before.add(new BigDecimal("0.5")));
+        assertThat(annualUsed(amir, 2027)).isEqualByComparingTo(before.add(new BigDecimal("0.5")));
     }
 
     // ---------- validation ----------
@@ -228,8 +230,9 @@ class PartialLeaveIT extends AbstractIntegrationTest {
         return parse(actions.andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 
-    private BigDecimal annualUsed(String token) throws Exception {
-        var res = mvc.perform(get("/api/leave/balances").header("Authorization", bearer(token)))
+    private BigDecimal annualUsed(String token, int leaveYear) throws Exception {
+        var res = mvc.perform(get("/api/leave/balances").param("year", String.valueOf(leaveYear))
+                        .header("Authorization", bearer(token)))
                 .andExpect(status().isOk()).andReturn();
         for (JsonNode b : parse(res.getResponse().getContentAsString())) {
             if ("ANNUAL".equals(b.get("code").asText())) {

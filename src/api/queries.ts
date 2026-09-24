@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { attendanceApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
-import type { ApplyLeaveBody, AssignShiftBody, ClockInBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateWorkLocationBody } from './types';
+import { attendanceApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveBalanceAdminApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
+import type { ApplyLeaveBody, AssignShiftBody, ClockInBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateWorkLocationBody } from './types';
 
 /** Centralised query keys. */
 export const qk = {
@@ -8,7 +8,9 @@ export const qk = {
   today: ['attendance', 'today'] as const,
   attendance: (month?: string) => ['attendance', 'history', month ?? 'current'] as const,
   liveAttendance: ['attendance', 'live'] as const,
-  leaveBalances: ['leave', 'balances'] as const,
+  leaveBalances: (year?: number) => ['leave', 'balances', year ?? 'current'] as const,
+  adminLeaveBalances: (employeeId: string, year?: number) =>
+    ['leave', 'balances', 'admin', employeeId, year ?? 'current'] as const,
   leaveRequests: ['leave', 'requests'] as const,
   pendingLeave: ['leave', 'pending'] as const,
   claims: ['claims', 'me'] as const,
@@ -58,7 +60,9 @@ export function useClockOut() {
 }
 
 // ---- Leave ----
-export const useLeaveBalances = () => useQuery({ queryKey: qk.leaveBalances, queryFn: leaveApi.balances });
+/** My leave balances. `year` names a leave year by its starting calendar year. */
+export const useLeaveBalances = (year?: number) =>
+  useQuery({ queryKey: qk.leaveBalances(year), queryFn: () => leaveApi.balances(year) });
 export const useLeaveRequests = () => useQuery({ queryKey: qk.leaveRequests, queryFn: leaveApi.requests });
 export const usePendingLeave = () => useQuery({ queryKey: qk.pendingLeave, queryFn: leaveApi.pending });
 
@@ -110,6 +114,26 @@ export function useUpdateWorkLocation() {
     mutationFn: ({ id, body }: { id: string; body: UpdateWorkLocationBody }) =>
       workLocationApi.update(id, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workLocations'] }),
+  });
+}
+
+// ---- Leave balances (admin: entitlement overrides) ----
+/** One employee's balances for a leave year — powers the admin entitlement editor. */
+export const useAdminLeaveBalances = (employeeId: string | undefined, year?: number) => {
+  const id = employeeId ?? '';
+  return useQuery({
+    queryKey: qk.adminLeaveBalances(id, year),
+    queryFn: () => leaveBalanceAdminApi.list(id, year),
+    enabled: id.length > 0,
+  });
+};
+
+/** Override an employee's entitlement for one leave type / year. */
+export function useOverrideLeaveEntitlement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: OverrideLeaveEntitlementBody) => leaveBalanceAdminApi.override(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave'] }),
   });
 }
 

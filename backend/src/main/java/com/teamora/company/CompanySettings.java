@@ -3,6 +3,7 @@ package com.teamora.company;
 import com.teamora.common.BaseEntity;
 import com.teamora.common.WorkWeek;
 import com.teamora.employee.PayBasis;
+import com.teamora.leave.LeaveYear;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -43,6 +44,13 @@ public class CompanySettings extends BaseEntity {
     @Column(name = "default_hours_per_day", nullable = false, precision = 4, scale = 2)
     private BigDecimal defaultHoursPerDay;
 
+    /**
+     * Calendar month (1–12) the company's leave year starts on. 1 = the leave year
+     * is the calendar year; 4 = an April–March leave year.
+     */
+    @Column(name = "leave_year_start_month", nullable = false)
+    private int leaveYearStartMonth;
+
     /** A settings row seeded with the standard Malaysian defaults (Mon–Fri, 8h, monthly). */
     public static CompanySettings defaultsFor(Company company) {
         CompanySettings s = new CompanySettings();
@@ -50,6 +58,7 @@ public class CompanySettings extends BaseEntity {
         s.setDefaultPayBasis(PayBasis.MONTHLY);
         s.setDefaultWorkingDays((short) WorkWeek.MON_TO_FRI);
         s.setDefaultHoursPerDay(new BigDecimal("8.00"));
+        s.setLeaveYearStartMonth(LeaveYear.DEFAULT_START_MONTH);
         return s;
     }
 }

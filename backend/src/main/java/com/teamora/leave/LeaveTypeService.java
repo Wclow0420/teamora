@@ -63,6 +63,9 @@ public class LeaveTypeService {
                 .paid(req.paid() == null || req.paid())
                 .defaultEntitlementDays(req.defaultEntitlementDays() != null ? req.defaultEntitlementDays() : 0)
                 .accrual(req.accrual() != null ? req.accrual() : LeaveAccrual.FIXED_ANNUAL)
+                .carryForwardMaxDays(req.carryForwardMaxDays() != null
+                        ? req.carryForwardMaxDays().setScale(2, java.math.RoundingMode.HALF_UP)
+                        : java.math.BigDecimal.ZERO.setScale(2))
                 .colorKey(req.colorKey() != null && !req.colorKey().isBlank() ? req.colorKey().trim() : "coral")
                 .active(req.active() == null || req.active())
                 .sortOrder(req.sortOrder() != null ? req.sortOrder() : nextSortOrder(company.getId()))
@@ -78,6 +81,9 @@ public class LeaveTypeService {
         if (req.paid() != null) t.setPaid(req.paid());
         if (req.defaultEntitlementDays() != null) t.setDefaultEntitlementDays(req.defaultEntitlementDays());
         if (req.accrual() != null) t.setAccrual(req.accrual());
+        if (req.carryForwardMaxDays() != null) {
+            t.setCarryForwardMaxDays(req.carryForwardMaxDays().setScale(2, java.math.RoundingMode.HALF_UP));
+        }
         if (req.colorKey() != null && !req.colorKey().isBlank()) t.setColorKey(req.colorKey().trim());
         if (req.active() != null) t.setActive(req.active());
         if (req.sortOrder() != null) t.setSortOrder(req.sortOrder());
@@ -99,6 +105,7 @@ public class LeaveTypeService {
                     .paid(s.paid())
                     .defaultEntitlementDays(s.entitlement())
                     .accrual(s.accrual())
+                    .carryForwardMaxDays(java.math.BigDecimal.ZERO.setScale(2))
                     .colorKey(s.color())
                     .active(true)
                     .sortOrder(s.sort())

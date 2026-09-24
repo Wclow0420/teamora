@@ -10,13 +10,15 @@ import java.util.UUID;
 
 public interface LeaveBalanceRepository extends JpaRepository<LeaveBalance, UUID> {
 
+    /** An employee's balances for one leave year, ordered like the leave-type catalogue. */
     @Query("""
             select b from LeaveBalance b
             join fetch b.leaveType t
-            where b.employee.id = :employeeId
+            where b.employee.id = :employeeId and b.leaveYear = :leaveYear
             order by t.sortOrder asc, t.name asc
             """)
-    List<LeaveBalance> findByEmployeeId(@Param("employeeId") UUID employeeId);
+    List<LeaveBalance> findByEmployeeIdAndLeaveYear(@Param("employeeId") UUID employeeId,
+                                                    @Param("leaveYear") int leaveYear);
 
-    Optional<LeaveBalance> findByEmployeeIdAndLeaveTypeId(UUID employeeId, UUID leaveTypeId);
+    Optional<LeaveBalance> findByEmployeeIdAndLeaveTypeIdAndLeaveYear(UUID employeeId, UUID leaveTypeId, int leaveYear);
 }
