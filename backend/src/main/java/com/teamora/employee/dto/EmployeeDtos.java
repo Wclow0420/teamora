@@ -60,8 +60,20 @@ public final class EmployeeDtos {
             /** First day of employment — drives first-year leave proration. */
             java.time.LocalDate joinDate,
             Role role,
+            /**
+             * New reporting manager. Omitted/null leaves the current one UNCHANGED —
+             * use {@link #clearReportingManager()} to unassign.
+             */
             UUID reportingManagerId,
+            /** Set true (with no {@code reportingManagerId}) to unassign the reporting manager. */
+            Boolean clearReportingManager,
+            /**
+             * New assigned work location. Omitted/null leaves the current one UNCHANGED —
+             * use {@link #clearWorkLocation()} to unassign.
+             */
             UUID workLocationId,
+            /** Set true (with no {@code workLocationId}) to unassign the work location. */
+            Boolean clearWorkLocation,
             @PositiveOrZero BigDecimal monthlySalary,
             MaritalStatus maritalStatus,
             Boolean spouseWorking,

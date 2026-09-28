@@ -120,7 +120,10 @@ public class EmployeeService {
     @Transactional
     public EmployeeResponse update(Employee caller, UUID id, UpdateEmployeeRequest req) {
         UUID companyId = caller.getCompany().getId();
-        Employee e = employees.findByIdAndCompanyId(id, companyId)
+        // Fetch-join the manager + work location: now that a PATCH can leave them
+        // untouched, the response must still report the values already on the row
+        // (an uninitialized lazy proxy reads back as "unassigned").
+        Employee e = employees.findByIdAndCompanyIdWithManager(id, companyId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
 
         if (req.fullName() != null && !req.fullName().isBlank()) e.setFullName(req.fullName().trim());
@@ -142,8 +145,21 @@ public class EmployeeService {
         if (req.taxNo() != null) e.setTaxNo(trimToNull(req.taxNo()));
         if (req.bankName() != null) e.setBankName(trimToNull(req.bankName()));
         if (req.bankAccountNo() != null) e.setBankAccountNo(trimToNull(req.bankAccountNo()));
-        e.setReportingManager(resolveReportingManager(companyId, req.reportingManagerId(), e.getId()));
-        e.setWorkLocation(resolveWorkLocation(companyId, req.workLocationId()));
+
+        // Associations are tri-state on a PATCH: an id reassigns, an explicit clear flag
+        // unassigns, and omitting both leaves the current value alone. (Before the clear
+        // flags existed these two lines ran unconditionally, so a PATCH of any single
+        // field silently wiped the manager + work location.)
+        if (req.reportingManagerId() != null) {
+            e.setReportingManager(resolveReportingManager(companyId, req.reportingManagerId(), e.getId()));
+        } else if (Boolean.TRUE.equals(req.clearReportingManager())) {
+            e.setReportingManager(null);
+        }
+        if (req.workLocationId() != null) {
+            e.setWorkLocation(resolveWorkLocation(companyId, req.workLocationId()));
+        } else if (Boolean.TRUE.equals(req.clearWorkLocation())) {
+            e.setWorkLocation(null);
+        }
 
         if (req.role() != null && req.role() != e.getRole()) {
             rejectOwnerRole(req.role());
@@ -215,7 +231,7 @@ public class EmployeeService {
         return mgr;
     }
 
-    /** Resolve an assigned work location within the company; null id clears the assignment. */
+    /** Resolve an assigned work location within the company; a null id means "no location". */
     private WorkLocation resolveWorkLocation(UUID companyId, UUID workLocationId) {
         if (workLocationId == null) return null;
         return workLocations.findByIdAndCompanyId(workLocationId, companyId)

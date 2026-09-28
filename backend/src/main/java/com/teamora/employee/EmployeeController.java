@@ -72,7 +72,11 @@ public class EmployeeController {
         return employeeService.changeRole(me.getCompany().getId(), id, req);
     }
 
-    /** Update an employee's profile (name / job title / department / role / reporting manager). */
+    /**
+     * Partially update an employee's profile. Only the fields present in the body change;
+     * the reporting manager and work location are unassigned by sending
+     * {@code clearReportingManager} / {@code clearWorkLocation} = true, never by omission.
+     */
     @PatchMapping("/{id}")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public EmployeeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeRequest req) {

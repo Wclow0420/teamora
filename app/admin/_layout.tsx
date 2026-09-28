@@ -15,7 +15,13 @@ export default function AdminLayout() {
       <Stack.Screen name="schedule" />
       <Stack.Screen name="employee-new" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="shift-assign" options={{ animation: 'slide_from_bottom' }} />
+      {/* employee hub + its focused category sub-screens */}
       <Stack.Screen name="employee-edit" />
+      <Stack.Screen name="employee-profile" />
+      <Stack.Screen name="employee-employment" />
+      <Stack.Screen name="employee-compensation" />
+      <Stack.Screen name="employee-statutory" />
+      <Stack.Screen name="employee-leave" />
       <Stack.Screen name="company-settings" />
       <Stack.Screen name="payroll-export" />
       <Stack.Screen name="leave-type-edit" options={{ animation: 'slide_from_bottom' }} />

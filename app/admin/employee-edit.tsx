@@ -1,339 +1,223 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { View, Text } from 'react-native';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
-import { Avatar, Button, Card, Chip, Icon, ScreenHeader, SelectChips, TextField, type SelectOption } from '@/components/ui';
-import { ReportingManagerField } from '@/components/ReportingManagerField';
-import { WorkLocationField } from '@/components/WorkLocationField';
-import { CompensationFields } from '@/components/CompensationFields';
-import { StatutoryBankFields } from '@/components/StatutoryBankFields';
-import { LeaveEntitlementFields } from '@/components/LeaveEntitlementFields';
-import { useCompanySettings, useEmployee, useMe, useTransferOwnership, useUpdateEmployee } from '@/api/queries';
-import { ApiError } from '@/api/client';
-import type { MaritalStatus, PayBasis, Role } from '@/api/types';
-import { WEEKDAYS_MASK } from '@/lib/workweek';
-import { palette, font, tint } from '@/theme';
+import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
+import { Avatar, Card, Chip, Icon, IconTile, ScreenHeader, type IconName } from '@/components/ui';
+import { useAdminLeaveBalances, useEmployee } from '@/api/queries';
+import type { EmployeeResponse, LeaveBalance, Role } from '@/api/types';
+import { ringgit, summaryLine } from '@/lib/employeeFields';
+import { formatDecimal } from '@/lib/numbers';
+import { describeMask } from '@/lib/workweek';
+import { palette, font, radius, spacing, tint } from '@/theme';
 
-/** Parse a pay-basis param string, defaulting to MONTHLY. */
-function parsePayBasis(v: string | undefined): PayBasis {
-  return v === 'DAILY' || v === 'HOURLY' ? v : 'MONTHLY';
-}
-/** Parse an hours-per-day input → a positive number, or undefined if blank/invalid. */
-function parseHours(text: string): number | undefined {
-  const trimmed = text.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
+const ROLE_LABEL: Record<Role, string> = {
+  OWNER: 'Owner',
+  HR_ADMIN: 'HR Admin',
+  MANAGER: 'Manager',
+  EMPLOYEE: 'Employee',
+};
 
-type EditableRole = Extract<Role, 'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'>;
+const ROLE_TONE: Record<Role, { color: string; bg: string }> = {
+  OWNER: { color: palette.violet, bg: tint.violet },
+  HR_ADMIN: { color: palette.coral, bg: tint.coral },
+  MANAGER: { color: palette.amber, bg: tint.amber },
+  EMPLOYEE: { color: palette.soft, bg: tint.neutral },
+};
 
-const ROLE_OPTIONS: SelectOption<EditableRole>[] = [
-  { value: 'EMPLOYEE', label: 'Employee' },
-  { value: 'MANAGER', label: 'Manager' },
-  { value: 'HR_ADMIN', label: 'HR Admin' },
-];
+/** A category tile: one slice of the employee record, edited on its own screen. */
+type Category = {
+  key: string;
+  title: string;
+  icon: IconName;
+  color: string;
+  background: string;
+  /** One-line recap of the current values; `null` renders a muted "Not set". */
+  summary: string | null;
+  /** True while this tile's own data is still loading — keeps the line blank. */
+  pending?: boolean;
+  href: Href;
+};
 
-const MARITAL_OPTIONS: SelectOption<MaritalStatus>[] = [
-  { value: 'SINGLE', label: 'Single' },
-  { value: 'MARRIED', label: 'Married' },
-];
-
-const SPOUSE_OPTIONS: SelectOption<'WORKING' | 'NOT_WORKING'>[] = [
-  { value: 'NOT_WORKING', label: 'Not working' },
-  { value: 'WORKING', label: 'Working' },
-];
-
-/** Parse a salary input → a non-negative number, or undefined if blank/invalid. */
-function parseSalary(text: string): number | undefined {
-  const trimmed = text.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
-  return Number.isFinite(n) && n >= 0 ? n : undefined;
+/** "Sales Executive · Retail" */
+function profileSummary(e: EmployeeResponse): string | null {
+  return summaryLine([e.jobTitle, e.department]);
 }
 
-/** Parse a children-count input → a non-negative integer, or undefined if blank/invalid. */
-function parseChildren(text: string): number | undefined {
-  const trimmed = text.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
-  return Number.isInteger(n) && n >= 0 ? n : undefined;
+/** "Employee · Nadia Rahman" */
+function employmentSummary(e: EmployeeResponse): string | null {
+  return summaryLine([ROLE_LABEL[e.role], e.reportingManagerName ?? 'Owner approves']);
 }
 
-export default function EmployeeEdit() {
+/** "RM 4,000 · Mon–Fri · 8h" */
+function compensationSummary(e: EmployeeResponse): string | null {
+  return summaryLine([
+    e.monthlySalary != null ? ringgit(e.monthlySalary) : 'No salary',
+    describeMask(e.workingDays),
+    `${formatDecimal(e.hoursPerDay)}h`,
+  ]);
+}
+
+/** "NRIC set · Maybank" */
+function statutorySummary(e: EmployeeResponse): string | null {
+  return summaryLine([
+    e.nric ? 'NRIC set' : null,
+    e.bankName ?? (e.bankAccountNo ? 'Bank set' : null),
+    e.epfNo ? 'EPF no.' : null,
+  ]);
+}
+
+/** "Annual 16 · Medical 14" — the first two leave types, with their entitlement. */
+function leaveSummary(rows: LeaveBalance[]): string | null {
+  return summaryLine(rows.slice(0, 2).map((b) => `${b.name} ${formatDecimal(b.entitled)}`));
+}
+
+/**
+ * Employee hub — the screen you land on when you tap a team member.
+ *
+ * Rather than one very long form, the record is split into five categories, each
+ * shown as a tile with a one-line recap of what's currently set. Tapping a tile
+ * opens a focused screen that saves only that slice (the employee PATCH is
+ * partial, so the untouched categories are never overwritten).
+ *
+ * Route name kept as `employee-edit` — the staff list already links here.
+ */
+export default function EmployeeHub() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    id: string;
-    name: string;
-    email?: string;
-    jobTitle?: string;
-    department?: string;
-    role: Role;
-    reportingManagerId?: string;
-    workLocationId?: string;
-    workLocationName?: string;
-    monthlySalary?: string;
-    maritalStatus?: string;
-    spouseWorking?: string;
-    numChildren?: string;
-    payBasis?: string;
-    workingDays?: string;
-    hoursPerDay?: string;
-  }>();
-  const me = useMe();
-  const update = useUpdateEmployee();
-  const transfer = useTransferOwnership();
-  const settings = useCompanySettings();
-
-  const targetIsOwner = params.role === 'OWNER';
-  const iAmOwner = me.data?.role === 'OWNER';
-  const isSelf = me.data?.id === params.id;
-  const canTransfer = iAmOwner && !targetIsOwner && !isSelf;
-
-  const [fullName, setFullName] = useState(params.name ?? '');
-  const [jobTitle, setJobTitle] = useState(params.jobTitle ?? '');
-  const [department, setDepartment] = useState(params.department ?? '');
-  const [salary, setSalary] = useState(params.monthlySalary ?? '');
-  const [role, setRole] = useState<EditableRole>(targetIsOwner ? 'HR_ADMIN' : ((params.role as EditableRole) ?? 'EMPLOYEE'));
-  const [reportingManagerId, setReportingManagerId] = useState<string | undefined>(params.reportingManagerId || undefined);
-  const [workLocationId, setWorkLocationId] = useState<string | undefined>(params.workLocationId || undefined);
-  const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(params.maritalStatus === 'MARRIED' ? 'MARRIED' : 'SINGLE');
-  const [spouseWorking, setSpouseWorking] = useState<'WORKING' | 'NOT_WORKING'>(params.spouseWorking === 'true' ? 'WORKING' : 'NOT_WORKING');
-  const [children, setChildren] = useState(params.numChildren ?? '');
-  // Statutory & bank identity — the staff LIST omits these, so seed from detail.
-  const [nric, setNric] = useState('');
-  const [epfNo, setEpfNo] = useState('');
-  const [socsoNo, setSocsoNo] = useState('');
-  const [taxNo, setTaxNo] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [bankAccountNo, setBankAccountNo] = useState('');
-  const [seededStatutory, setSeededStatutory] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Compensation — the staff LIST omits these fields, so seed from the employee
-  // DETAIL endpoint (effective values); only fall back to company defaults if the
-  // detail can't be loaded.
+  const params = useLocalSearchParams<{ id: string; name?: string; email?: string; role?: Role }>();
   const detail = useEmployee(params.id);
-  const [payBasis, setPayBasis] = useState<PayBasis>(parsePayBasis(params.payBasis));
-  const [workingDays, setWorkingDays] = useState<number>(
-    params.workingDays ? Number(params.workingDays) : WEEKDAYS_MASK,
-  );
-  const [hoursPerDay, setHoursPerDay] = useState(params.hoursPerDay || '8');
-  const [seeded, setSeeded] = useState(false);
+  const balances = useAdminLeaveBalances(params.id);
 
-  useEffect(() => {
-    if (seeded) return;
-    const d = detail.data;
-    if (d) {
-      // Detail is authoritative — effective pay basis / schedule / hours.
-      if (d.payBasis) setPayBasis(parsePayBasis(d.payBasis));
-      if (d.workingDays != null) setWorkingDays(d.workingDays);
-      if (d.hoursPerDay != null) setHoursPerDay(String(d.hoursPerDay));
-      setWorkLocationId(d.workLocationId ?? undefined);
-      setSeeded(true);
-    } else if (detail.isError && settings.data) {
-      // Fallback: detail unavailable → company defaults.
-      setPayBasis(settings.data.defaultPayBasis);
-      setWorkingDays(settings.data.defaultWorkingDays);
-      setHoursPerDay(String(settings.data.defaultHoursPerDay));
-      setSeeded(true);
-    }
-  }, [seeded, detail.data, detail.isError, settings.data]);
+  const e = detail.data;
+  const name = e?.fullName ?? params.name ?? 'Employee';
+  const email = e?.email ?? params.email;
+  const role = e?.role ?? params.role;
+  const initial = (name || '?').charAt(0).toUpperCase();
 
-  // Seed statutory & bank fields from the detail endpoint (list omits them).
-  useEffect(() => {
-    if (seededStatutory || !detail.data) return;
-    const d = detail.data;
-    setNric(d.nric ?? '');
-    setEpfNo(d.epfNo ?? '');
-    setSocsoNo(d.socsoNo ?? '');
-    setTaxNo(d.taxNo ?? '');
-    setBankName(d.bankName ?? '');
-    setBankAccountNo(d.bankAccountNo ?? '');
-    setSeededStatutory(true);
-  }, [seededStatutory, detail.data]);
-
-  const initial = (params.name ?? '?').charAt(0).toUpperCase();
-
-  const onSave = async () => {
-    if (update.isPending) return;
-    setError(null);
-    if (!fullName.trim()) {
-      setError('Name is required.');
-      return;
-    }
-    const monthlySalary = parseSalary(salary);
-    if (salary.trim() && monthlySalary === undefined) {
-      setError('Enter a valid monthly salary, or leave it blank.');
-      return;
-    }
-    const numChildren = parseChildren(children);
-    if (children.trim() && numChildren === undefined) {
-      setError('Enter a valid number of children, or leave it blank.');
-      return;
-    }
-    try {
-      await update.mutateAsync({
-        id: params.id,
-        body: {
-          fullName: fullName.trim(),
-          jobTitle: jobTitle.trim(),
-          department: department.trim(),
-          monthlySalary,
-          reportingManagerId,
-          workLocationId: workLocationId ?? null,
-          maritalStatus,
-          spouseWorking: maritalStatus === 'MARRIED' ? spouseWorking === 'WORKING' : undefined,
-          numChildren,
-          payBasis,
-          workingDays,
-          hoursPerDay: parseHours(hoursPerDay),
-          nric: nric.trim(),
-          epfNo: epfNo.trim(),
-          socsoNo: socsoNo.trim(),
-          taxNo: taxNo.trim(),
-          bankName: bankName.trim(),
-          bankAccountNo: bankAccountNo.trim(),
-          // Never send a role for the owner (changed only via transfer).
-          role: targetIsOwner ? undefined : role,
-        },
-      });
-      router.back();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not save changes. Check your connection.');
-    }
-  };
-
-  const onTransfer = () => {
-    Alert.alert(
-      'Transfer ownership?',
-      `${params.name} will become the company owner, and you'll become an HR Admin. This can't be undone by you afterwards.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+  const categories: Category[] = e
+    ? [
         {
-          text: 'Transfer',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await transfer.mutateAsync(params.id);
-              Alert.alert('Ownership transferred', `${params.name} is now the owner.`);
-              router.back();
-            } catch (e) {
-              setError(e instanceof ApiError ? e.message : 'Could not transfer ownership.');
-            }
-          },
+          key: 'profile',
+          title: 'Profile',
+          icon: 'user',
+          color: palette.coral,
+          background: tint.coral,
+          summary: profileSummary(e),
+          href: { pathname: '/admin/employee-profile', params: { id: e.id, name: e.fullName } },
         },
-      ],
-    );
-  };
+        {
+          key: 'employment',
+          title: 'Employment',
+          icon: 'briefcase',
+          color: palette.sage,
+          background: tint.sage,
+          summary: employmentSummary(e),
+          href: { pathname: '/admin/employee-employment', params: { id: e.id, name: e.fullName } },
+        },
+        {
+          key: 'compensation',
+          title: 'Compensation',
+          icon: 'wallet',
+          color: palette.amber,
+          background: tint.amber,
+          summary: compensationSummary(e),
+          href: { pathname: '/admin/employee-compensation', params: { id: e.id, name: e.fullName } },
+        },
+        {
+          key: 'statutory',
+          title: 'Statutory & bank',
+          icon: 'shield',
+          color: palette.violet,
+          background: tint.violet,
+          summary: statutorySummary(e),
+          href: { pathname: '/admin/employee-statutory', params: { id: e.id, name: e.fullName } },
+        },
+        {
+          key: 'leave',
+          title: 'Leave entitlement',
+          icon: 'sun',
+          color: palette.soft,
+          background: tint.neutral,
+          summary: leaveSummary(balances.data ?? []),
+          pending: balances.isLoading,
+          href: { pathname: '/admin/employee-leave', params: { id: e.id, name: e.fullName } },
+        },
+      ]
+    : [];
 
   return (
     <Screen>
-      <ScreenHeader back title="Edit employee" />
+      <ScreenHeader back title="Employee" />
 
-      {/* identity + email (read-only) */}
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 20 }}>
+      {/* identity — name, read-only email, role */}
+      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: spacing.lg, borderRadius: radius['2xl'] }}>
         <Avatar initial={initial} size={52} tint={{ bg: tint.neutral, fg: palette.soft }} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[font(700), { fontSize: 15, color: palette.ink }]} numberOfLines={1}>
-            {fullName || params.name}
+            {name}
           </Text>
-          {!!params.email && (
+          {!!email && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 }}>
               <Icon name="mail" size={13} color={palette.faint} />
               <Text style={[font(500), { fontSize: 12, color: palette.faint }]} numberOfLines={1}>
-                {params.email}
+                {email}
               </Text>
             </View>
           )}
         </View>
+        {!!role && (
+          <Chip label={ROLE_LABEL[role]} color={ROLE_TONE[role].color} background={ROLE_TONE[role].bg} size="sm" />
+        )}
       </Card>
 
-      <View style={{ gap: 14, marginTop: 16 }}>
-        <TextField label="Full name" value={fullName} onChangeText={setFullName} autoCapitalize="words" />
-        <TextField label="Job title" value={jobTitle} onChangeText={setJobTitle} placeholder="e.g. Sales Executive" />
-        <TextField label="Department" value={department} onChangeText={setDepartment} placeholder="e.g. Retail" />
-        <TextField
-          label="Monthly salary (RM)"
-          value={salary}
-          onChangeText={setSalary}
-          keyboardType="decimal-pad"
-          placeholder="e.g. 3500"
-        />
-        {targetIsOwner ? (
-          <View>
-            <Text style={[font(700), { fontSize: 12, color: palette.soft, marginBottom: 7 }]}>Role</Text>
-            <Chip label="Owner" background={tint.violet} color={palette.violet} leading={<Icon name="shield" size={13} color={palette.violet} />} />
+      <Text style={[font(500), { fontSize: 12, color: palette.faint, marginTop: spacing.lg, lineHeight: 18 }]}>
+        Pick a section to edit. Each one saves on its own — the rest stays as it is.
+      </Text>
+
+      <View style={{ marginTop: spacing.md }}>
+        <AsyncBoundary loading={detail.isLoading} error={detail.error} onRetry={detail.refetch} minHeight={280}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+            {categories.map((c) => (
+              <Card
+                key={c.key}
+                padding={0}
+                style={{
+                  width: '47%',
+                  flexGrow: 1,
+                  minHeight: 138,
+                  padding: spacing.lg,
+                  borderRadius: radius['2xl'],
+                  justifyContent: 'space-between',
+                }}
+                onPress={() => router.push(c.href)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <IconTile icon={c.icon} color={c.color} background={c.background} size={40} />
+                  <Icon name="chevR" size={16} color={palette.inactive} />
+                </View>
+                <View style={{ marginTop: spacing.md }}>
+                  <Text style={[font(700), { fontSize: 13.5, color: palette.ink, lineHeight: 18 }]} numberOfLines={2}>
+                    {c.title}
+                  </Text>
+                  <Text
+                    style={[
+                      font(500),
+                      {
+                        fontSize: 11.5,
+                        lineHeight: 16,
+                        marginTop: 5,
+                        color: c.summary ? palette.soft : palette.inactive,
+                      },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {c.pending ? '' : (c.summary ?? 'Not set')}
+                  </Text>
+                </View>
+              </Card>
+            ))}
           </View>
-        ) : (
-          <SelectChips label="Role" options={ROLE_OPTIONS} value={role} onChange={setRole} />
-        )}
-        <ReportingManagerField value={reportingManagerId} onChange={setReportingManagerId} />
-        <WorkLocationField
-          value={workLocationId}
-          onChange={setWorkLocationId}
-          currentName={detail.data?.workLocationName ?? params.workLocationName}
-        />
-
-        <CompensationFields
-          monthlySalary={parseSalary(salary) ?? null}
-          payBasis={payBasis}
-          onPayBasis={setPayBasis}
-          workingDays={workingDays}
-          onWorkingDays={setWorkingDays}
-          hoursPerDay={hoursPerDay}
-          onHoursPerDay={setHoursPerDay}
-        />
-
-        <View style={{ gap: 14, marginTop: 4 }}>
-          <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>Tax profile</Text>
-          <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8, lineHeight: 16 }]}>
-            Used to estimate monthly income tax (PCB) on payslips.
-          </Text>
-          <SelectChips label="Marital status" options={MARITAL_OPTIONS} value={maritalStatus} onChange={setMaritalStatus} />
-          {maritalStatus === 'MARRIED' && (
-            <SelectChips label="Spouse" options={SPOUSE_OPTIONS} value={spouseWorking} onChange={setSpouseWorking} />
-          )}
-          <TextField
-            label="Number of children"
-            value={children}
-            onChangeText={setChildren}
-            keyboardType="number-pad"
-            placeholder="e.g. 2"
-          />
-        </View>
-
-        <StatutoryBankFields
-          nric={nric}
-          onNric={setNric}
-          epfNo={epfNo}
-          onEpfNo={setEpfNo}
-          socsoNo={socsoNo}
-          onSocsoNo={setSocsoNo}
-          taxNo={taxNo}
-          onTaxNo={setTaxNo}
-          bankName={bankName}
-          onBankName={setBankName}
-          bankAccountNo={bankAccountNo}
-          onBankAccountNo={setBankAccountNo}
-        />
-
-        <LeaveEntitlementFields employeeId={params.id} />
-
-        {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
-      </View>
-
-      <View style={{ marginTop: 22, gap: 12 }}>
-        <Button label={update.isPending ? 'Saving…' : 'Save changes'} icon="check" disabled={update.isPending} onPress={onSave} />
-        {canTransfer && (
-          <Button
-            label={transfer.isPending ? 'Transferring…' : 'Transfer ownership'}
-            icon="shield"
-            variant="light"
-            disabled={transfer.isPending}
-            onPress={onTransfer}
-          />
-        )}
+        </AsyncBoundary>
       </View>
     </Screen>
   );

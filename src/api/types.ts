@@ -468,6 +468,8 @@ export type CreateEmployeeBody = {
   email: string;
   password: string;
   role: Role;
+  /** ISO yyyy-MM-dd. Drives first-year leave proration. */
+  joinDate?: string;
   jobTitle?: string;
   department?: string;
   staffId?: string;
@@ -493,14 +495,26 @@ export type CreateEmployeeBody = {
 export type ChangeRoleBody = { role: Role };
 export type UpdateEmployeeBody = {
   fullName?: string;
+  /** ISO yyyy-MM-dd. Drives first-year leave proration. */
+  joinDate?: string;
   jobTitle?: string;
   department?: string;
   phone?: string;
   staffId?: string;
   role?: Role;
+  /**
+   * Assign a reporting manager. The update is *partial*: send the id to set it,
+   * send `clearReportingManager: true` to clear it, and send NEITHER to leave
+   * the current manager untouched (what every screen that doesn't own this
+   * field must do).
+   */
   reportingManagerId?: string;
-  /** Assign a work site, or `null` to clear (no geofence). */
+  /** Clear the reporting manager (approvals fall back to the company owner). */
+  clearReportingManager?: boolean;
+  /** Assign a work site. Same partial semantics as `reportingManagerId`. */
   workLocationId?: string | null;
+  /** Clear the assigned work site (no geofence). */
+  clearWorkLocation?: boolean;
   monthlySalary?: number;
   maritalStatus?: MaritalStatus;
   spouseWorking?: boolean;

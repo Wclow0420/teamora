@@ -320,6 +320,12 @@ export function useChangeRole() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
   });
 }
+/**
+ * Partial employee update. The `['employees']` prefix invalidates the staff list
+ * AND the detail query (`['employees', 'detail', id]`) — React Query matches by
+ * key prefix — so the employee hub's tile summaries refresh as soon as one of
+ * its category screens saves and pops back.
+ */
 export function useUpdateEmployee() {
   const qc = useQueryClient();
   return useMutation({
