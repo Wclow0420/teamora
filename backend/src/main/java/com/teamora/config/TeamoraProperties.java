@@ -7,8 +7,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record TeamoraProperties(
         boolean seed,
         Jwt jwt,
-        Cors cors
+        Cors cors,
+        PasswordReset passwordReset
 ) {
+    /**
+     * {@code exposeCode}: LOCAL DEV / TEST ONLY — return the one-time reset code in
+     * the forgot-password response so the flow is testable without an email provider.
+     */
+    public record PasswordReset(boolean exposeCode) {}
+
+    /** True only when the reset code may be echoed back to the caller (never in production). */
+    public boolean exposeResetCode() {
+        return passwordReset != null && passwordReset.exposeCode();
+    }
+
     public record Jwt(
             String secret,
             long accessTokenTtlMinutes,

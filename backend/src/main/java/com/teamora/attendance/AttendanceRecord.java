@@ -50,6 +50,14 @@ public class AttendanceRecord extends TenantEntity {
     @Column(name = "worked_minutes")
     private Integer workedMinutes;
 
+    /**
+     * Minutes spent clocked OUT in the middle of the day (clock out → clock in
+     * again). Worked time is always net of this.
+     */
+    @Builder.Default
+    @Column(name = "break_minutes", nullable = false)
+    private int breakMinutes = 0;
+
     private String location;
 
     /** GPS coordinates captured at clock-in (geofence audit). Null when unassigned/no coords. */

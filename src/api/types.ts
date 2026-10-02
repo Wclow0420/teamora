@@ -171,6 +171,18 @@ export type ChangePasswordBody = {
   refreshToken?: string;
 };
 
+/** Ask for a one-time reset code (`POST /api/auth/forgot-password`, public → always 200). */
+export type ForgotPasswordBody = { email: string };
+export type ForgotPasswordResponse = {
+  /**
+   * The code itself — only ever sent by a local/dev backend that has
+   * `PASSWORD_RESET_EXPOSE_CODE` on. Null/absent everywhere else.
+   */
+  devCode?: string | null;
+};
+/** Redeem a reset code (`POST /api/auth/reset-password`, public → 204). */
+export type ResetPasswordWithCodeBody = { email: string; code: string; newPassword: string };
+
 /** Admin sets a temporary password (`POST /api/employees/{id}/reset-password` → 204). */
 export type ResetPasswordBody = { newPassword: string };
 
@@ -212,6 +224,13 @@ export type TodayStatus = {
   status: string;
   clockInAt: string | null;
   workedMinutes: number | null;
+  /**
+   * When they last clocked out (ISO instant); null while working — including
+   * after clocking in again the same day. Optional: an older backend doesn't send it.
+   */
+  clockOutAt?: string | null;
+  /** Minutes spent clocked out between sessions today (0 = none). Optional as above. */
+  breakMinutes?: number;
   shift: string;
   /** The assigned work site's name; null when the employee has no site. */
   location: string | null;
@@ -565,12 +584,22 @@ export type UpdateEmployeeBody = {
   /** Clear the assigned work site (no geofence). */
   clearWorkLocation?: boolean;
   monthlySalary?: number;
+  /** Clear the salary (the employee is then not on payroll). Never send with `monthlySalary`. */
+  clearMonthlySalary?: boolean;
   maritalStatus?: MaritalStatus;
   spouseWorking?: boolean;
   numChildren?: number;
   payBasis?: PayBasis;
   workingDays?: number;
   hoursPerDay?: number;
+  /**
+   * Drop the employee's own override so they follow the company default again.
+   * Same partial semantics as `clearReportingManager`: send the value OR its
+   * clear flag, never both (the server rejects that with a 400).
+   */
+  clearPayBasis?: boolean;
+  clearWorkingDays?: boolean;
+  clearHoursPerDay?: boolean;
   /** Statutory & bank identity (all optional). */
   nric?: string;
   epfNo?: string;

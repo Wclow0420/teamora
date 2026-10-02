@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, Alert } from 'react-native';
+import { Alert, View, Text, TextInput, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -109,16 +109,22 @@ export default function Login() {
         <Field icon="mail" placeholder="Work email" value={email} onChangeText={setEmail} keyboardType="email-address" />
         <Field icon="lock" placeholder="Password" secure value={password} onChangeText={setPassword} />
         {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
-        {/* No email infrastructure exists, so be honest: HR resets it. */}
         <Pressable
           accessibilityRole="button"
           hitSlop={10}
-          onPress={() =>
+          onPress={() => {
+            // The code-based reset needs an email provider, which isn't wired up
+            // yet — so real users are pointed at their HR admin, and the flow is
+            // only reachable in dev/preview builds (where the code is shown).
+            if (showInternalHints()) {
+              router.push('/forgot-password');
+              return;
+            }
             Alert.alert(
               'Forgot your password?',
               'Ask your HR admin to reset your password. They can set a new one from your employee page.',
-            )
-          }
+            );
+          }}
           style={{ alignSelf: 'flex-end', marginTop: 2 }}
         >
           <Text style={[font(600), { fontSize: 12.5, color: palette.coral }]}>Forgot password?</Text>

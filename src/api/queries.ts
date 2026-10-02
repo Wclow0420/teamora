@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi, authApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveBalanceAdminApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
 import { getRefreshToken } from './tokenStore';
-import type { ApplyLeaveBody, AssignShiftBody, ChangePasswordBody, ClockInBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody } from './types';
+import type { ApplyLeaveBody, AssignShiftBody, ChangePasswordBody, ClockInBody, ResetPasswordWithCodeBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody } from './types';
 
 /** Centralised query keys. */
 export const qk = {
@@ -56,6 +56,14 @@ export function useChangePassword() {
     mutationFn: (body: Pick<ChangePasswordBody, 'currentPassword' | 'newPassword'>) =>
       authApi.changePassword({ ...body, refreshToken: getRefreshToken() ?? undefined }),
   });
+}
+/** Signed-out: ask for a one-time password reset code. */
+export function useForgotPassword() {
+  return useMutation({ mutationFn: (email: string) => authApi.forgotPassword({ email }) });
+}
+/** Signed-out: redeem the code and set a new password. */
+export function useResetPasswordWithCode() {
+  return useMutation({ mutationFn: (body: ResetPasswordWithCodeBody) => authApi.resetPassword(body) });
 }
 /** OWNER/HR_ADMIN: set a temporary password for a team member. */
 export function useResetEmployeePassword() {

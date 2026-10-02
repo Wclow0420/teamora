@@ -360,16 +360,22 @@ needed. Full details in `backend/README.md`.
 - **Layout:** package-by-feature under `com.teamora` (`auth`, `company`,
   `employee`, `attendance`, `leave`, `claim`, `overtime`, `payroll`, `calendar`,
   `schedule`, `notification`, + `config`, `security`, `common`, `seed`).
-- **Migrations:** currently `V1`–`V19` (init → multi-tenancy & roles →
+- **Migrations:** currently `V1`–`V20` (init → multi-tenancy & roles →
   reporting-manager + single-owner → overtime → schedule → company events →
   notifications → push tokens → employee monthly_salary → tax profile + payslip PCB →
   configurable comp + leave types → work locations → clock-in photo → employee
   statutory/bank → partial-day leave → leave accrual/carry-forward → claim receipt
   photo → QA round 2 (work start time, late grace, override flag, per-company
-  staff id) → work start time as `HH:mm` text).
+  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks).
 - **Wall-clock times are stored as `HH:mm` text** (`common.HhMmConverter`), not SQL
   `TIME` — a `TIME` column goes through the JDBC time-zone conversion and a
   migration default reads back shifted.
+- **Password recovery** is a one-time 6-digit code (`auth/PasswordResetService`):
+  `POST /api/auth/forgot-password` → `POST /api/auth/reset-password`. Delivery is the
+  pluggable `PasswordResetSender`; the default bean only logs the code (no email
+  provider chosen yet). `PASSWORD_RESET_EXPOSE_CODE=true` (local dev only, default
+  false) returns the code as `devCode`; the app shows the flow only when
+  `showInternalHints()` is true, and production keeps "ask your HR admin".
 - **Dev deploy without an image rebuild:** `./scripts/test-backend.sh` builds the
   jar; `docker cp target/teamora-api-1.0.0.jar teamora-api:/app/app.jar && docker
   restart teamora-api` applies new migrations on start.

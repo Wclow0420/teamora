@@ -5,6 +5,9 @@ import {
   AttendanceSummary,
   AuthResponse,
   ChangePasswordBody,
+  ForgotPasswordBody,
+  ForgotPasswordResponse,
+  ResetPasswordWithCodeBody,
   ChangeRoleBody,
   Claim,
   ClaimSummary,
@@ -61,6 +64,11 @@ export const authApi = {
   logout: (refreshToken: string) => api.post<void>('/api/auth/logout', { refreshToken }),
   me: () => api.get<EmployeeResponse>('/api/auth/me'),
   changePassword: (body: ChangePasswordBody) => api.post<void>('/api/auth/change-password', body),
+  /** Public. Always succeeds, whether or not the email has an account (no enumeration). */
+  forgotPassword: (body: ForgotPasswordBody) =>
+    api.post<ForgotPasswordResponse | undefined>('/api/auth/forgot-password', body, false),
+  /** Public. Redeems the one-time code and sets the new password. */
+  resetPassword: (body: ResetPasswordWithCodeBody) => api.post<void>('/api/auth/reset-password', body, false),
 };
 
 export const employeeApi = {

@@ -94,8 +94,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         // Foreground location — used to verify staff are on-site at clock-in.
         NSLocationWhenInUseUsageDescription:
           "Teamora uses your location to verify you're at your work site when you clock in.",
-        // Front camera — used to take the clock-in selfie (attendance proof).
-        NSCameraUsageDescription: 'Teamora uses the camera to take your clock-in photo.',
+        // Camera — clock-in selfie (attendance proof) and claim receipt photos.
+        NSCameraUsageDescription: 'Teamora uses the camera for your clock-in photo and to photograph claim receipts.',
       },
     },
 
@@ -132,8 +132,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-camera',
         {
-          // Front-camera clock-in selfie (attendance proof) — foreground only.
-          cameraPermission: 'Teamora uses the camera to take your clock-in photo.',
+          // Clock-in selfie + claim receipt photos — foreground only.
+          cameraPermission: 'Teamora uses the camera for your clock-in photo and to photograph claim receipts.',
           recordAudioAndroid: false,
         },
       ],

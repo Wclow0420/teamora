@@ -37,6 +37,10 @@ teamora:
   cors:
     # Comma-separated allowed origins for the mobile/web clients.
     allowed-origins: ${TEAMORA_CORS_ORIGINS:*}
+  password-reset:
+    # LOCAL DEV ONLY: echo the one-time code back as `devCode` from
+    # POST /api/auth/forgot-password. Must stay false anywhere real.
+    expose-code: ${PASSWORD_RESET_EXPOSE_CODE:false}
 
 springdoc:
   swagger-ui:

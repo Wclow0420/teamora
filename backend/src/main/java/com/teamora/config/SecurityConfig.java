@@ -32,6 +32,8 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/register",
             "/api/auth/refresh",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
             "/error",  // the servlet ERROR dispatch (after sendError) must not be re-secured
             "/actuator/health",
             "/v3/api-docs/**",

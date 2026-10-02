@@ -63,18 +63,36 @@ public class AttendanceService {
                 .findByEmployeeIdAndWorkDate(current.getId(), day)
                 .orElse(null);
 
-        if (record != null && record.getClockInAt() != null) {
+        boolean resuming = record != null && record.getClockInAt() != null;
+        if (resuming && record.getClockOutAt() == null) {
             throw new BadRequestException("Already clocked in today");
         }
 
         // Geofence: if the employee is assigned to an active work location, the
         // phone must be within its radius. Unassigned/inactive → no geofence.
+        // Enforced on every clock-in, including clocking in again after a break.
         WorkLocation site = assignedActiveSite(current);
         if (site != null) {
             enforceGeofence(site, latitude, longitude);
         }
 
         Instant now = Instant.now();
+        if (resuming) {
+            // Clock in again after clocking out: reopen the same record. The time
+            // spent clocked out becomes break time; the original clock-in time,
+            // late/present status, location and first selfie all stand.
+            long away = Math.max(0, Duration.between(record.getClockOutAt(), now).toMinutes());
+            record.setBreakMinutes(record.getBreakMinutes() + (int) away);
+            record.setClockOutAt(null);
+            record.setWorkedMinutes(null);
+            if (record.getClockInPhotoType() == null && photoBase64 != null && !photoBase64.isBlank()) {
+                PhotoCodec.Photo photo = PhotoCodec.decode(photoBase64);
+                record.setClockInPhoto(photo.bytes());
+                record.setClockInPhotoType(photo.contentType());
+            }
+            return todayResponse(attendance.save(record), current);
+        }
+
         LocalTime localNow = now.atZone(KL).toLocalTime();
         AttendanceStatus status = isLate(localNow, companySettings.resolve(current.getCompany()))
                 ? AttendanceStatus.LATE
@@ -160,7 +178,9 @@ public class AttendanceService {
 
         Instant now = Instant.now();
         record.setClockOutAt(now);
-        record.setWorkedMinutes((int) Duration.between(record.getClockInAt(), now).toMinutes());
+        // Net of breaks (clocked-out gaps earlier today); never negative.
+        long gross = Duration.between(record.getClockInAt(), now).toMinutes();
+        record.setWorkedMinutes((int) Math.max(0, gross - record.getBreakMinutes()));
 
         return todayResponse(attendance.save(record), current);
     }

@@ -2933,3 +2933,43 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Admin → employee → Employment → Reset password → enter a password → Reset.
 - **Expected:** A confirmation ("Reset …'s password?") appears before anything changes. Your own record shows no Reset button.
 - [ ] Pass
+
+---
+
+## J. Round 3 changes (added 3 Oct 2026)
+
+#### R3-01 — Forgot password with a one-time code (dev / preview builds)
+- **Needs:** backend started with `PASSWORD_RESET_EXPOSE_CODE=true`.
+- **Steps:** Login → Forgot password? → enter a real account's email → Send code. Enter the code from the "Dev only" note and a new 8+ character password twice → Set new password. Sign in with the new password; try the old one.
+- **Expected:** New password works, old one fails, other devices are signed out. Restore the demo password afterwards.
+- [ ] Pass
+
+#### R3-02 — Unknown email reveals nothing
+- **Steps:** Request a code for an email with no account.
+- **Expected:** Same "If that email has a Teamora account…" screen, no dev code, no error.
+- [ ] Pass
+
+#### R3-03 — Wrong, expired and reused codes
+- **Steps:** Enter a wrong code; reuse a code that already worked; wait 10 minutes and use an old code; enter 5 wrong codes then the right one.
+- **Expected:** Each shows "That code is incorrect or has expired." After 5 wrong tries the code is dead and a new one is needed.
+- [ ] Pass
+
+#### R3-04 — Resend limit
+- **Steps:** Tap Resend code four times within 15 minutes.
+- **Expected:** No error is shown, but only the first three produce a code; the third stays valid.
+- [ ] Pass
+
+#### R3-05 — Production build does not offer the code flow
+- **Steps:** On a production build tap Forgot password?
+- **Expected:** The "Ask your HR admin" alert, not the code screen (until an email provider is connected).
+- [ ] Pass
+
+#### R3-06 — Clock in again after clocking out
+- **Steps:** Clock in, clock out, wait a few minutes, tap "Clock in again" on Home and complete clock-in, then clock out.
+- **Expected:** Timer continues from the earlier worked time (the gap is not counted), Home shows "Break N min", the final worked total excludes the break, the first clock-in time and Late/Present status are unchanged. With an assigned site, clocking in again outside the radius is refused.
+- [ ] Pass
+
+#### R3-07 — Clear pay settings back to the company default
+- **Steps:** Admin → employee → Compensation. Empty the hours field → Save. Choose "Use company default" for working days and pay basis → Save. Empty the salary → Save.
+- **Expected:** Hours, days and basis show the company defaults again and follow later changes to company settings; with no salary the employee is left out of the next payroll run.
+- [ ] Pass

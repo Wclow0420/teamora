@@ -135,6 +135,14 @@ public class EmployeeService {
         Employee e = employees.findByIdAndCompanyIdWithManager(id, companyId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
 
+        // Pay settings are tri-state: a value sets the override, a clear flag drops it
+        // (back to the company default), omitting both leaves it alone. Both at once
+        // is contradictory — reject before touching anything.
+        boolean clearSalary = clearing(req.clearMonthlySalary(), req.monthlySalary(), "monthlySalary");
+        boolean clearDays = clearing(req.clearWorkingDays(), req.workingDays(), "workingDays");
+        boolean clearHours = clearing(req.clearHoursPerDay(), req.hoursPerDay(), "hoursPerDay");
+        boolean clearBasis = clearing(req.clearPayBasis(), req.payBasis(), "payBasis");
+
         if (req.fullName() != null && !req.fullName().isBlank()) e.setFullName(req.fullName().trim());
         if (req.jobTitle() != null) e.setJobTitle(req.jobTitle().isBlank() ? null : req.jobTitle().trim());
         if (req.department() != null) e.setDepartment(req.department().isBlank() ? null : req.department().trim());
@@ -154,6 +162,10 @@ public class EmployeeService {
         if (req.payBasis() != null) e.setPayBasis(req.payBasis());
         if (req.workingDays() != null) e.setWorkingDays(req.workingDays().shortValue());
         if (req.hoursPerDay() != null) e.setHoursPerDay(req.hoursPerDay());
+        if (clearSalary) e.setMonthlySalary(null);
+        if (clearBasis) e.setPayBasis(null);
+        if (clearDays) e.setWorkingDays(null);
+        if (clearHours) e.setHoursPerDay(null);
         if (req.nric() != null) e.setNric(trimToNull(req.nric()));
         if (req.epfNo() != null) e.setEpfNo(trimToNull(req.epfNo()));
         if (req.socsoNo() != null) e.setSocsoNo(trimToNull(req.socsoNo()));
@@ -256,6 +268,16 @@ public class EmployeeService {
     }
 
     // ---- helpers ----
+
+    /** True when a clear flag is set; 400 if its value was sent in the same request. */
+    private static boolean clearing(Boolean clearFlag, Object value, String field) {
+        if (!Boolean.TRUE.equals(clearFlag)) return false;
+        if (value != null) {
+            String flag = "clear" + Character.toUpperCase(field.charAt(0)) + field.substring(1);
+            throw new BadRequestException("Send either " + field + " or " + flag + ", not both");
+        }
+        return true;
+    }
 
     /** Trim a nullable string, mapping blank → null (so optional identity fields don't store empty strings). */
     private static String trimToNull(String s) {

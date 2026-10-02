@@ -1,0 +1,5 @@
+# Test profile (activated by AbstractIntegrationTest).
+teamora:
+  password-reset:
+    # Tests read the one-time code from the response instead of an inbox.
+    expose-code: true

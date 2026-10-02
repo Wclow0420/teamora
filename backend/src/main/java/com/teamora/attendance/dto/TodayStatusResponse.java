@@ -14,7 +14,11 @@ public record TodayStatusResponse(
         Instant clockInAt,
         Integer workedMinutes,
         String shift,
-        String location
+        String location,
+        /** Minutes spent clocked out mid-day (0 when none). Worked time is net of this. */
+        int breakMinutes,
+        /** When the employee last clocked out today; null while working / not clocked in. */
+        Instant clockOutAt
 ) {
     private static final DateTimeFormatter H_MM_A = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
 
@@ -26,14 +30,16 @@ public record TodayStatusResponse(
     public static TodayStatusResponse from(AttendanceRecord r, LocalTime workStart) {
         String shift = workStart == null ? null : "starts " + workStart.format(H_MM_A);
         if (r == null) {
-            return new TodayStatusResponse(AttendanceStatus.ABSENT, null, null, shift, null);
+            return new TodayStatusResponse(AttendanceStatus.ABSENT, null, null, shift, null, 0, null);
         }
         return new TodayStatusResponse(
                 r.getStatus(),
                 r.getClockInAt(),
                 r.getWorkedMinutes(),
                 shift,
-                r.getLocation()
+                r.getLocation(),
+                r.getBreakMinutes(),
+                r.getClockOutAt()
         );
     }
 }

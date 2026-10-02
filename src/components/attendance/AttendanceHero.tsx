@@ -41,9 +41,19 @@ function HeroTop({ label, live, inAt }: { label: string; live?: boolean; inAt?: 
   );
 }
 
-/** Running worked time since clock-in. Its own component so only it re-renders each second. */
-function RunningTime({ since }: { since: string }) {
-  const { h, m, s } = useLiveTimer(since);
+/** "Break 45 min" / "Break 1 h 05 min" — time spent clocked out between sessions today. */
+function breakLabel(minutes: number): string {
+  if (minutes < 60) return `Break ${minutes} min`;
+  const m = minutes % 60;
+  return m ? `Break ${Math.floor(minutes / 60)} h ${pad2(m)} min` : `Break ${Math.floor(minutes / 60)} h`;
+}
+
+/**
+ * Running worked time: now − clock-in − breaks. Its own component so only it
+ * re-renders each second.
+ */
+function RunningTime({ since, breakMinutes }: { since: string; breakMinutes: number }) {
+  const { h, m, s } = useLiveTimer(since, breakMinutes);
   return (
     <Text style={[font(800), { fontSize: 44, lineHeight: 52, letterSpacing: -1.4, color: palette.white, marginTop: 9 }, NUM]}>
       {h}:{pad2(m)}
@@ -57,11 +67,22 @@ function RunningTime({ since }: { since: string }) {
  * today's attendance record:
  *  - not clocked in  → calm prompt + "Clock In" (or "On leave today")
  *  - clocked in      → live worked time since clock-in + "Clock Out"
- *  - clocked out     → "Done for today" with the final worked total
+ *  - clocked out     → "Done for today" with the final worked total, plus
+ *                       "Clock in again" (back through the normal clock-in
+ *                       screen, so the selfie + geofence apply again)
+ *
+ * Worked time is always net of breaks (time clocked out between sessions).
  */
 export function AttendanceHero({ today, onClockIn, onClockOut, clockingOut = false }: Props) {
   const clockedIn = today.clockInAt != null;
-  const clockedOut = clockedIn && today.workedMinutes != null;
+  // `clockOutAt` is the truth once the backend sends it (it goes back to null on
+  // a same-day clock-in again); an older backend only has `workedMinutes`.
+  const clockedOut =
+    clockedIn && (today.clockOutAt !== undefined ? today.clockOutAt != null : today.workedMinutes != null);
+  // Only a backend that reports breaks can resume a clocked-out day.
+  const canResume = today.breakMinutes !== undefined;
+  const breakMinutes = Math.max(0, Math.round(today.breakMinutes ?? 0));
+  const workedLine = breakMinutes > 0 ? `Worked today · ${breakLabel(breakMinutes)}` : 'Worked today';
   const onLeave = !clockedIn && today.status.toUpperCase() === 'ON_LEAVE';
   const inAt = formatTime(today.clockInAt);
   const shift = today.shift ? today.shift : null;
@@ -95,9 +116,9 @@ export function AttendanceHero({ today, onClockIn, onClockOut, clockingOut = fal
     body = (
       <>
         <HeroTop label="Currently working" live inAt={inAt} />
-        <RunningTime since={today.clockInAt as string} />
-        <Text style={[font(500), { fontSize: 12.5, color: onDark.text, marginTop: 4 }]}>
-          Worked today
+        <RunningTime since={today.clockInAt as string} breakMinutes={breakMinutes} />
+        <Text style={[font(500), { fontSize: 12.5, lineHeight: 18, color: onDark.text, marginTop: 4 }]}>
+          {workedLine}
         </Text>
         <Button
           label={clockingOut ? 'Clocking out…' : 'Clock Out'}
@@ -121,15 +142,18 @@ export function AttendanceHero({ today, onClockIn, onClockOut, clockingOut = fal
           {pad2(total % 60)}
           <Text style={[font(800), { fontSize: 24, color: onDark.dim, letterSpacing: -0.5 }]}>m</Text>
         </Text>
-        <Text style={[font(500), { fontSize: 12.5, color: onDark.text, marginTop: 4 }]}>
-          Worked today
+        <Text style={[font(500), { fontSize: 12.5, lineHeight: 18, color: onDark.text, marginTop: 4 }]}>
+          {workedLine}
         </Text>
+        {canResume && (
+          <Button label="Clock in again" icon="clock" variant="light" height={48} style={{ marginTop: 16 }} onPress={onClockIn} />
+        )}
       </>
     );
   }
 
   return (
-    <View style={[{ backgroundColor: palette.espresso, borderRadius: radius.hero, padding: 20, paddingBottom: clockedOut ? 20 : 18, overflow: 'hidden' }, shadows.float]}>
+    <View style={[{ backgroundColor: palette.espresso, borderRadius: radius.hero, padding: 20, paddingBottom: clockedOut && !canResume ? 20 : 18, overflow: 'hidden' }, shadows.float]}>
       {/* single restrained coral wash, pushed off-canvas so only a soft arc reads */}
       <View style={{ position: 'absolute', right: -84, top: -104, width: 230, height: 230, borderRadius: radius.pill, backgroundColor: onDark.glow }} />
       {body}

@@ -94,7 +94,17 @@ public final class EmployeeDtos {
             String socsoNo,
             String taxNo,
             String bankName,
-            String bankAccountNo
+            String bankAccountNo,
+            // Clear a pay setting back to the company default (column → null). Each is
+            // mutually exclusive with its value: sending both is a 400.
+            /** True → no salary on file (the employee is not on payroll). */
+            Boolean clearMonthlySalary,
+            /** True → follow the company's default working days. */
+            Boolean clearWorkingDays,
+            /** True → follow the company's default hours per day. */
+            Boolean clearHoursPerDay,
+            /** True → follow the company's default pay basis. */
+            Boolean clearPayBasis
     ) {}
 
     /** Lightweight option for the "reporting manager" picker. */
