@@ -60,7 +60,7 @@ export default function ClockIn() {
   const assignedSite = me.data?.workLocationName ?? null;
   // Only a real assigned site is ever named — otherwise fall back to the company itself.
   const workLocation = assignedSite ?? me.data?.companyName ?? 'Your workplace';
-  const locationSubtitle = assignedSite ? 'Verify you are on-site to clock in' : 'Your work location';
+  const locationSubtitle = assignedSite ? 'Verify you are on-site to clock in' : 'No site assigned — you can clock in from anywhere';
 
   const busy = clockIn.isPending || locating || capturing;
 

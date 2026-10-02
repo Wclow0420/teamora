@@ -10,26 +10,29 @@ type Props = {
   onChange: (mask: number) => void;
   /** Inline validation message (e.g. no day selected). */
   error?: string | null;
+  /** Read-only: the days are shown dimmed and can't be toggled. */
+  disabled?: boolean;
 };
 
 /**
  * Seven Mon–Sun toggles that read/write a weekday bitmask. Selected days are
  * ink-filled (working days); unselected are rest days.
  */
-export function WeekdayToggles({ label, value, onChange, error }: Props) {
+export function WeekdayToggles({ label, value, onChange, error, disabled = false }: Props) {
   return (
     <View>
       {label && <Text style={[font(700), { fontSize: 12, color: palette.soft, marginBottom: 8 }]}>{label}</Text>}
-      <View style={{ flexDirection: 'row', gap: 6 }}>
+      <View style={{ flexDirection: 'row', gap: 6, opacity: disabled ? 0.45 : 1 }}>
         {WEEKDAYS.map((w) => {
           const on = isBitSet(value, w.bit);
           return (
             <Pressable
               key={w.bit}
               onPress={() => onChange(toggleBit(value, w.bit))}
+              disabled={disabled}
               accessibilityRole="switch"
               accessibilityLabel={w.label}
-              accessibilityState={{ checked: on }}
+              accessibilityState={{ checked: on, disabled }}
               style={{
                 flex: 1,
                 paddingVertical: 11,

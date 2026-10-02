@@ -48,7 +48,12 @@ public record EmployeeResponse(
         Integer workingDays,
         BigDecimal hoursPerDay,
         BigDecimal derivedDailyRate,
-        BigDecimal derivedHourlyRate
+        BigDecimal derivedHourlyRate,
+        // The employee's OWN stored pay settings (raw columns). Null ⇒ no personal
+        // override, i.e. the effective value above comes from the company default.
+        PayBasis payBasisOverride,
+        Integer workingDaysOverride,
+        BigDecimal hoursPerDayOverride
 ) {
     /**
      * Safe in any context: only reads the reporting manager when it's already
@@ -103,6 +108,9 @@ public record EmployeeResponse(
                 e.getNumChildren(),
                 e.getNric(), e.getEpfNo(), e.getSocsoNo(), e.getTaxNo(),
                 e.getBankName(), e.getBankAccountNo(),
-                payBasis, workingDays, hoursPerDay, derivedDailyRate, derivedHourlyRate);
+                payBasis, workingDays, hoursPerDay, derivedDailyRate, derivedHourlyRate,
+                e.getPayBasis(),
+                e.getWorkingDays() != null ? Integer.valueOf(e.getWorkingDays()) : null,
+                e.getHoursPerDay());
     }
 }

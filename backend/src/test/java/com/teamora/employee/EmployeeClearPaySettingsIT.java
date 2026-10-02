@@ -13,6 +13,8 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -88,7 +90,11 @@ class EmployeeClearPaySettingsIT extends AbstractIntegrationTest {
     void clearPayBasis_fallsBackToCompanyDefault() throws Exception {
         Co co = company("bas");
         patchEmp(co, "{\"clearPayBasis\":true}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.payBasis").value("MONTHLY"));
+                .andExpect(jsonPath("$.payBasis").value("MONTHLY"))
+                .andExpect(jsonPath("$.payBasisOverride").value(nullValue()))
+                // The untouched overrides are still reported as personal values.
+                .andExpect(jsonPath("$.workingDaysOverride").value(63))
+                .andExpect(jsonPath("$.hoursPerDayOverride").value(6.5));
         assertNull(stored(co).getPayBasis());
         assertOthersKept(stored(co), "basis");
     }
@@ -97,7 +103,9 @@ class EmployeeClearPaySettingsIT extends AbstractIntegrationTest {
     void clearWorkingDays_fallsBackToCompanyDefault() throws Exception {
         Co co = company("day");
         patchEmp(co, "{\"clearWorkingDays\":true}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.workingDays").value(31));
+                .andExpect(jsonPath("$.workingDays").value(31))
+                .andExpect(jsonPath("$.workingDaysOverride").value(nullValue()))
+                .andExpect(jsonPath("$.payBasisOverride").value("DAILY"));
         assertNull(stored(co).getWorkingDays());
         assertOthersKept(stored(co), "days");
     }
@@ -108,6 +116,7 @@ class EmployeeClearPaySettingsIT extends AbstractIntegrationTest {
         JsonNode res = om.readTree(patchEmp(co, "{\"clearHoursPerDay\":true}").andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
         assertEquals(0, new BigDecimal("8").compareTo(res.get("hoursPerDay").decimalValue()));
+        assertTrue(res.has("hoursPerDayOverride") && res.get("hoursPerDayOverride").isNull());
         assertNull(stored(co).getHoursPerDay());
         assertOthersKept(stored(co), "hours");
     }
@@ -121,7 +130,24 @@ class EmployeeClearPaySettingsIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.jobTitle").value("Barista"))
                 .andExpect(jsonPath("$.monthlySalary").value(nullValue()))
                 .andExpect(jsonPath("$.payBasis").value("MONTHLY"))
-                .andExpect(jsonPath("$.workingDays").value(31));
+                .andExpect(jsonPath("$.workingDays").value(31))
+                .andExpect(jsonPath("$.payBasisOverride").value(nullValue()))
+                .andExpect(jsonPath("$.workingDaysOverride").value(nullValue()))
+                .andExpect(jsonPath("$.hoursPerDayOverride").value(nullValue()));
+        // Setting them again reports the personal values, on PATCH and on the detail GET.
+        patchEmp(co, "{\"payBasis\":\"HOURLY\",\"workingDays\":7,\"hoursPerDay\":4.5}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payBasisOverride").value("HOURLY"))
+                .andExpect(jsonPath("$.workingDaysOverride").value(7))
+                .andExpect(jsonPath("$.hoursPerDayOverride").value(4.5));
+        mvc.perform(get("/api/employees/" + co.employeeId()).header("Authorization", bearer(co.ownerToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payBasis").value("HOURLY"))
+                .andExpect(jsonPath("$.payBasisOverride").value("HOURLY"))
+                .andExpect(jsonPath("$.workingDaysOverride").value(7))
+                .andExpect(jsonPath("$.hoursPerDayOverride").value(4.5));
+        patchEmp(co, "{\"clearPayBasis\":true,\"clearWorkingDays\":true,\"clearHoursPerDay\":true}")
+                .andExpect(status().isOk());
         Employee e = stored(co);
         assertNull(e.getMonthlySalary());
         assertNull(e.getPayBasis());

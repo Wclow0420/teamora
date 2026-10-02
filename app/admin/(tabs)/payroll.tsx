@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
-import { Avatar, Button, Card, Chip, Icon, SectionLabel } from '@/components/ui';
+import { Avatar, Button, Card, Chip, Icon, MonthStepper, SectionLabel } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import {
   useApprovePayrollRun,
@@ -13,7 +13,7 @@ import {
 } from '@/api/queries';
 import type { PayrollRun, PayslipStatus } from '@/api/types';
 import { alertError } from '@/lib/errors';
-import { currentPeriod } from '@/lib/period';
+import { currentPeriod, periodLabel, shiftPeriod } from '@/lib/period';
 import { palette, font, radius, gradients, tint } from '@/theme';
 
 function statusChipColors(status: PayslipStatus): { color: string; background: string } {
@@ -29,7 +29,11 @@ function statusChipColors(status: PayslipStatus): { color: string; background: s
 
 export default function Payroll() {
   const router = useRouter();
-  const period = currentPeriod();
+  // The month on screen — every query and action below works on this period.
+  const thisMonth = currentPeriod();
+  const [period, setPeriod] = useState(thisMonth);
+  const isCurrent = period === thisMonth;
+  const monthName = periodLabel(period);
   const q = usePayrollRun(period);
   const run = useRunPayroll();
   const approve = useApprovePayrollRun();
@@ -45,7 +49,7 @@ export default function Payroll() {
   const onApprove = () => {
     Alert.alert(
       'Approve payroll?',
-      `This locks ${data?.periodLabel ?? 'this run'} for payment. You can still mark it as paid afterwards.`,
+      `This locks ${data?.periodLabel ?? monthName} for payment. You can still mark it as paid afterwards.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Approve', onPress: () => approve.mutate(period, { onError: (e) => alertError("Couldn't approve payroll", e) }) },
@@ -56,7 +60,7 @@ export default function Payroll() {
   const onMarkPaid = () => {
     Alert.alert(
       'Mark as paid?',
-      `Confirm that ${data?.netLabel ? `RM ${data.netLabel}` : 'this payroll'} has been disbursed to staff. This can't be undone.`,
+      `Confirm that ${data?.netLabel ? `RM ${data.netLabel}` : 'this payroll'} for ${data?.periodLabel ?? monthName} has been disbursed to staff. This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Mark as paid', onPress: () => markPaid.mutate(period, { onError: (e) => alertError("Couldn't mark as paid", e) }) },
@@ -69,15 +73,27 @@ export default function Payroll() {
       bottomInset={70}
       large
       title="Payroll"
-      subtitle={data?.periodLabel ?? 'This month'}
+      subtitle={data?.periodLabel ?? monthName}
       accessory={
-        data?.generated ? (
-          <Chip label={data.statusLabel} background={chip.background} color={chip.color} />
-        ) : undefined
+        <MonthStepper
+          label={periodLabel(period, true)}
+          onPrev={busy ? undefined : () => setPeriod((p) => shiftPeriod(p, -1))}
+          onNext={isCurrent || busy ? undefined : () => setPeriod((p) => shiftPeriod(p, 1))}
+        />
       }
     >
       <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
-        {data && (data.generated ? <RunView data={data} /> : <EmptyState busy={busy} onRun={onRun} />)}
+        {data?.generated && (
+          <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+            <Chip label={data.statusLabel} background={chip.background} color={chip.color} dot />
+          </View>
+        )}
+        {data &&
+          (data.generated ? (
+            <RunView data={data} />
+          ) : (
+            <EmptyState busy={busy} onRun={onRun} monthName={monthName} isCurrent={isCurrent} />
+          ))}
         {data?.generated && (
           <>
             <Actions
@@ -105,7 +121,18 @@ export default function Payroll() {
   );
 }
 
-function EmptyState({ busy, onRun }: { busy: boolean; onRun: () => void }) {
+function EmptyState({
+  busy,
+  onRun,
+  monthName,
+  isCurrent,
+}: {
+  busy: boolean;
+  onRun: () => void;
+  /** The selected month, e.g. "June 2026". */
+  monthName: string;
+  isCurrent: boolean;
+}) {
   return (
     <Card style={{ alignItems: 'center', paddingVertical: 32, borderRadius: radius.xl }}>
       <View
@@ -121,9 +148,12 @@ function EmptyState({ busy, onRun }: { busy: boolean; onRun: () => void }) {
       >
         <Icon name="wallet" size={28} color={palette.coral} />
       </View>
-      <Text style={[font(700), { fontSize: 16, color: palette.ink }]}>No payroll run yet</Text>
+      <Text style={[font(700), { fontSize: 16, color: palette.ink }]}>
+        {isCurrent ? 'No payroll run yet' : `No payroll run for ${monthName}`}
+      </Text>
       <Text style={[font(500), { fontSize: 13, color: palette.soft, textAlign: 'center', marginTop: 7, lineHeight: 19, paddingHorizontal: 12 }]}>
-        Generate this month's draft payslips from staff salaries, approved overtime and claims.
+        Generate {isCurrent ? "this month's" : `${monthName}'s`} draft payslips from staff salaries, approved overtime
+        and claims.
       </Text>
       <Button
         label={busy ? 'Running…' : 'Run payroll'}

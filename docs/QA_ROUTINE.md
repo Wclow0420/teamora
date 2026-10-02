@@ -2973,3 +2973,18 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Admin → employee → Compensation. Empty the hours field → Save. Choose "Use company default" for working days and pay basis → Save. Empty the salary → Save.
 - **Expected:** Hours, days and basis show the company defaults again and follow later changes to company settings; with no salary the employee is left out of the next payroll run.
 - [ ] Pass
+
+#### R3-08 — Calendar dates sit under the right weekday
+- **Steps:** Staff → Calendar. Compare today's date and the 1st of the month with the phone's own Calendar app. Step to next and previous month.
+- **Expected:** Seven columns in every row; each date is under its true weekday.
+- [ ] Pass
+
+#### R3-09 — Compensation shows which values are personal
+- **Steps:** Admin → an employee with no personal pay settings → Compensation. Then set Daily + a custom week + 6 hours, save, reopen.
+- **Expected:** First: "Company default (…)" selected, "Use company default" ticked, hours empty with the default as placeholder. After saving: the personal values show and the default options are unselected. Saving an untouched form changes nothing.
+- [ ] Pass
+
+#### R3-10 — Payroll for a past month
+- **Steps:** Admin → Payroll → step back a month and forward again.
+- **Expected:** Totals, status and breakdown are for the month shown; Run / Approve / Mark as paid act on that month; "next" is disabled at the current month.
+- [ ] Pass

@@ -161,6 +161,13 @@ export type EmployeeResponse = {
   /** Indicative derived rates for the CURRENT month (null when no salary set). */
   derivedDailyRate: number | null;
   derivedHourlyRate: number | null;
+  /**
+   * The employee's OWN stored pay settings. `null` = no personal value (the
+   * effective field above is the company default). Absent on an older backend.
+   */
+  payBasisOverride?: PayBasis | null;
+  workingDaysOverride?: number | null;
+  hoursPerDayOverride?: number | null;
 };
 
 /** Self-service password change (`POST /api/auth/change-password` → 204). */

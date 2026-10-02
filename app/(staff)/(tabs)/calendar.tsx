@@ -17,6 +17,13 @@ const LEGEND: [string, string][] = [
   ['Event', palette.violet],
 ];
 
+/**
+ * One-seventh of the row, rounded DOWN. `100 / 7` as a percentage rounds up
+ * per cell, the seven cells overflow the row by a hair, and the 7th wraps —
+ * which shifts every date onto the wrong weekday.
+ */
+const CELL_WIDTH = '14.2857%' as const;
+
 export default function Calendar() {
   const now = new Date();
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() }); // month 0-indexed
@@ -63,7 +70,7 @@ export default function Calendar() {
         {/* grid */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {cells.map((n, i) => {
-            if (!n) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1 }} />;
+            if (!n) return <View key={i} style={{ width: CELL_WIDTH, aspectRatio: 1 }} />;
             const isToday = n === todayDom;
             const dots = (q.data?.events?.[String(n)] ?? []).map((k) => accentFromKey(k).color);
             const cell = (
@@ -77,7 +84,7 @@ export default function Calendar() {
               </View>
             );
             return (
-              <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 1 }}>
+              <View key={i} style={{ width: CELL_WIDTH, aspectRatio: 1, padding: 1 }}>
                 {isToday ? (
                   <LinearGradient colors={gradients.coral} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }}>
                     {cell}

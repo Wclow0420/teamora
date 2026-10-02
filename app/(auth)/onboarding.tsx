@@ -8,7 +8,7 @@ import { OnboardingIllustration } from '@/components/onboarding/OnboardingIllust
 import { palette, font, radius, gradients, tint } from '@/theme';
 
 const FEATURES = [
-  { icon: 'face', title: 'Clock in with a glance', desc: 'Face + GPS check in under 2 seconds', color: palette.coral, bg: tint.coral },
+  { icon: 'face', title: 'Clock in with a glance', desc: 'A quick selfie and location check at your workplace', color: palette.coral, bg: tint.coral },
   { icon: 'sun', title: 'Time off in a tap', desc: 'Apply for leave and track approvals live', color: palette.amber, bg: tint.amber },
   { icon: 'wallet', title: 'Payday, crystal clear', desc: 'See every ringgit before it lands', color: palette.sage, bg: tint.sage },
 ] as const;

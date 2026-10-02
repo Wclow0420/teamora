@@ -15,7 +15,7 @@ const NUM: TextStyle = { fontVariant: ['tabular-nums'] };
 const QUICK = [
   { icon: 'leave', label: 'Leave', bg: tint.coral, color: palette.coral, href: '/leave' },
   { icon: 'receipt', label: 'Claim', bg: tint.amber, color: palette.amber, href: '/claims' },
-  { icon: 'calendar', label: 'Schedule', bg: tint.sage, color: palette.sage, href: '/calendar' },
+  { icon: 'calendar', label: 'Calendar', bg: tint.sage, color: palette.sage, href: '/calendar' },
   { icon: 'wallet', label: 'Payroll', bg: tint.violet, color: palette.violet, href: '/payroll' },
 ] as const;
 

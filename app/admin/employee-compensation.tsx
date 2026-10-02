@@ -13,7 +13,12 @@ import { NO_WORKING_DAYS_ERROR, WEEKDAYS_MASK, isEmptyMask } from '@/lib/workwee
 import { palette, font, spacing } from '@/theme';
 
 /** What the server had when the form opened — the baseline for "what changed". */
-type Seed = { salary: number | null } & CompensationDefaults;
+type Seed = { salary: number | null } & CompensationDefaults & {
+  /** How each pay setting opened: following the company default, or a personal value. */
+  basisChoice: PayBasisChoice;
+  defaultDays: boolean;
+  defaultHours: boolean;
+};
 
 /**
  * Employee hub → **Compensation**. Owns the monthly salary and the pay
@@ -44,13 +49,28 @@ export default function EmployeeCompensation() {
   useEffect(() => {
     if (seed || !detail.data) return;
     // The detail endpoint returns the *effective* values (own override else the
-    // company default), so it is the only seed this screen needs.
+    // company default) plus the raw `…Override` fields. An override that is
+    // explicitly null means "follows the company default", so that option opens
+    // selected. An older backend omits the fields (undefined) — then the
+    // effective value is shown as before.
     const d = detail.data;
+    const basisChoice: PayBasisChoice = d.payBasisOverride === null ? 'DEFAULT' : d.payBasis;
+    const defaultDays = d.workingDaysOverride === null;
+    const defaultHours = d.hoursPerDayOverride === null;
     setSalary(d.monthlySalary != null ? String(d.monthlySalary) : '');
-    setPayBasis(d.payBasis);
+    setPayBasis(basisChoice);
     setWorkingDays(d.workingDays);
-    setHoursPerDay(String(d.hoursPerDay));
-    setSeed({ salary: d.monthlySalary, payBasis: d.payBasis, workingDays: d.workingDays, hoursPerDay: d.hoursPerDay });
+    setUseDefaultDays(defaultDays);
+    setHoursPerDay(defaultHours ? '' : String(d.hoursPerDay));
+    setSeed({
+      salary: d.monthlySalary,
+      payBasis: d.payBasis,
+      workingDays: d.workingDays,
+      hoursPerDay: d.hoursPerDay,
+      basisChoice,
+      defaultDays,
+      defaultHours,
+    });
   }, [seed, detail.data]);
 
   const defaults: CompensationDefaults | null = settings.data
@@ -81,28 +101,34 @@ export default function EmployeeCompensation() {
       if (monthlySalary !== seed.salary) body.monthlySalary = monthlySalary;
     }
 
-    if (payBasis === 'DEFAULT') body.clearPayBasis = true;
-    else if (payBasis !== seed.payBasis) body.payBasis = payBasis;
+    // Each pay setting is sent only when it moved away from how it opened —
+    // an untouched "company default" stays a default, an untouched personal
+    // value stays as it is.
+    if (payBasis !== seed.basisChoice) {
+      if (payBasis === 'DEFAULT') body.clearPayBasis = true;
+      else body.payBasis = payBasis;
+    }
 
     if (useDefaultDays) {
-      body.clearWorkingDays = true;
+      if (!seed.defaultDays) body.clearWorkingDays = true;
     } else {
       if (isEmptyMask(workingDays)) {
         setError(NO_WORKING_DAYS_ERROR);
         return;
       }
-      if (workingDays !== seed.workingDays) body.workingDays = workingDays;
+      // Coming off the default pins the chosen days even if they match it.
+      if (seed.defaultDays || workingDays !== seed.workingDays) body.workingDays = workingDays;
     }
 
     if (!hoursPerDay.trim()) {
-      body.clearHoursPerDay = true;
+      if (!seed.defaultHours) body.clearHoursPerDay = true;
     } else {
       const hours = parseHours(hoursPerDay);
       if (hours === undefined) {
         setError('Enter a valid number of hours per day, or leave it blank for the company default.');
         return;
       }
-      if (hours !== seed.hoursPerDay) body.hoursPerDay = hours;
+      if (seed.defaultHours || hours !== seed.hoursPerDay) body.hoursPerDay = hours;
     }
 
     if (Object.keys(body).length === 0) {

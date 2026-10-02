@@ -40,7 +40,7 @@ type Props = {
 };
 
 /**
- * "Compensation" form section: pay basis, working-day schedule and hours/day —
+ * "Pay basis & schedule" form section: pay basis, working-day schedule and hours/day —
  * each either the employee's own value or "use the company default" — plus a
  * live derived daily/hourly rate preview for the current month.
  */
@@ -82,7 +82,7 @@ export function CompensationFields({
 
   return (
     <View style={{ gap: 14, marginTop: 4 }}>
-      <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>Compensation</Text>
+      <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>Pay basis & schedule</Text>
       <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8, lineHeight: 16 }]}>
         Daily and hourly rates derive from the monthly salary and the working-day schedule.
       </Text>
@@ -93,11 +93,10 @@ export function CompensationFields({
         <WeekdayToggles
           label="Working days"
           value={effectiveDays}
-          // Editing a day means this person now has their own schedule.
-          onChange={(mask) => {
-            if (useDefaultWorkingDays) onUseDefaultWorkingDays(false);
-            onWorkingDays(mask);
-          }}
+          onChange={onWorkingDays}
+          // Following the company default: its days are shown, dimmed and locked.
+          // Untick the box below to give this person their own schedule.
+          disabled={useDefaultWorkingDays}
           error={!useDefaultWorkingDays && isEmptyMask(workingDays) ? NO_WORKING_DAYS_ERROR : null}
         />
         <Pressable
