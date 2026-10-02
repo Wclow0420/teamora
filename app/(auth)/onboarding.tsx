@@ -3,7 +3,8 @@ import { View, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
-import { Button, Icon, IconTile, Placeholder } from '@/components/ui';
+import { Button, IconTile } from '@/components/ui';
+import { OnboardingIllustration } from '@/components/onboarding/OnboardingIllustration';
 import { palette, font, radius, gradients, tint } from '@/theme';
 
 const FEATURES = [
@@ -20,7 +21,7 @@ export default function Onboarding() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <LinearGradient colors={gradients.avatar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 30, height: 30, borderRadius: 9 }} />
-          <Text style={[font(800), { fontSize: 18, color: palette.ink, letterSpacing: -0.5 }]}>lumi</Text>
+          <Text style={[font(800), { fontSize: 18, color: palette.ink, letterSpacing: -0.5 }]}>Teamora</Text>
         </View>
         <Text style={[font(600), { fontSize: 13, color: palette.faint }]} onPress={() => router.push('/login')}>
           Skip
@@ -28,9 +29,9 @@ export default function Onboarding() {
       </View>
 
       {/* hero */}
-      <LinearGradient colors={gradients.creamSoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ marginTop: 18, height: 224, borderRadius: 26, borderWidth: 1, borderColor: '#F1D2B4', padding: 14 }}>
-        <Placeholder label="onboarding illustration" radius={16} tintColor="rgba(236,106,77,0.12)" />
-      </LinearGradient>
+      <View style={{ marginTop: 18 }}>
+        <OnboardingIllustration />
+      </View>
 
       <View style={{ marginTop: 22 }}>
         <Text style={[font(800), { fontSize: 27, lineHeight: 32, color: palette.ink, letterSpacing: -0.8 }]}>

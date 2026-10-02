@@ -46,6 +46,19 @@ export const tint = {
 } as const;
 
 /**
+ * Text + accents that sit on the dark `palette.espresso` hero surfaces. White at
+ * stepped opacities so copy stays warm against the brown rather than going grey.
+ */
+export const onDark = {
+  text: 'rgba(255,255,255,0.6)', // supporting copy
+  eyebrow: 'rgba(255,255,255,0.55)', // all-caps eyebrow
+  dim: 'rgba(255,255,255,0.5)', // de-emphasised numerals (seconds)
+  glow: 'rgba(236,106,77,0.10)', // the one restrained coral wash
+  live: '#7FB894', // "live" status dot — sage lifted for contrast on espresso
+  idle: 'rgba(255,255,255,0.32)', // static (not live) status dot
+} as const;
+
+/**
  * Brand gradients. Used *sparingly and intentionally* — a gradient earns its
  * place only on a genuine "hero" surface (the attendance timer, the clock-in
  * backdrop). Everything else is confident flat colour + real elevation. Ranges

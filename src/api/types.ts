@@ -226,6 +226,11 @@ export type LeaveBalance = {
   name: string;
   colorKey: string;
   paid: boolean;
+  /**
+   * How the type accrues. `NONE` = untracked (e.g. unpaid leave): there is no
+   * balance to show, so UIs must skip the balance tile and leave it out of totals.
+   */
+  accrual: LeaveAccrual;
   /** The leave year this row belongs to, named by its starting calendar year. */
   leaveYear: number;
   /** Fractional since partial-day leave — e.g. 12.5. Render via `formatDecimal`. */

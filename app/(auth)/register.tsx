@@ -38,7 +38,7 @@ export default function Register() {
   return (
     <Screen paddingX={24}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={[font(800), { fontSize: 20, color: palette.ink, letterSpacing: -0.5 }]}>lumi</Text>
+        <Text style={[font(800), { fontSize: 20, color: palette.ink, letterSpacing: -0.5 }]}>Teamora</Text>
         <Pressable onPress={() => router.back()}>
           <Text style={[font(600), { fontSize: 13, color: palette.faint }]}>Back</Text>
         </Pressable>

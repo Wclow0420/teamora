@@ -106,9 +106,12 @@ export default function Staff() {
                     <Text style={[font(700), { fontSize: 13.5, color: palette.ink }]} numberOfLines={1}>
                       {e.fullName}
                     </Text>
-                    <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 5 }]}>
-                      {e.jobTitle} · {e.department}
-                    </Text>
+                    {/* Only the parts that exist — no stray separator, no empty line. */}
+                    {(e.jobTitle || e.department) ? (
+                      <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 5 }]} numberOfLines={1}>
+                        {[e.jobTitle, e.department].filter(Boolean).join(' · ')}
+                      </Text>
+                    ) : null}
                   </View>
                   {e.department && <Chip label={e.department} dot background={tint.neutral} color={palette.soft} />}
                 </View>

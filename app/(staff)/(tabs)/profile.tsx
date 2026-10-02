@@ -6,9 +6,17 @@ import { Avatar, Card, Chip, Icon, IconTile, StatTile, type IconName } from '@/c
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { useAuth } from '@/hooks';
 import { useMe, useLeaveBalances, usePayslips } from '@/api/queries';
-import { palette, font, radius, tint } from '@/theme';
+import { formatDays } from '@/lib/numbers';
+import { palette, font, tint } from '@/theme';
 
-type MenuItem = { icon: IconName; label: string; meta?: string; color: string; bg: string };
+type MenuItem = {
+  icon: IconName;
+  label: string;
+  meta?: string;
+  color: string;
+  bg: string;
+  href: '/payroll' | '/leave' | '/claims' | '/notifications';
+};
 
 /** Whole-number-ish years since an ISO join date, e.g. "2.3 yrs". */
 function yearsSince(iso: string | null | undefined): string {
@@ -27,21 +35,19 @@ export default function Profile() {
   const payslips = usePayslips();
 
   const leaveLeft = balances.data
-    ? `${balances.data.reduce((sum, b) => sum + b.remaining, 0)} days`
+    ? formatDays(balances.data.filter((b) => b.accrual !== 'NONE').reduce((sum, b) => sum + b.remaining, 0))
     : '—';
 
   // Real payslip count (no fake placeholder) — blank until the query resolves.
   const payslipCount = payslips.data?.length ?? 0;
   const payslipsMeta = payslips.data ? `${payslipCount} available` : '';
 
+  // Every row goes somewhere real — a chevron never promises a screen that doesn't exist.
   const menu: MenuItem[] = [
-    { icon: 'user', label: 'Personal information', meta: '', color: palette.coral, bg: tint.coral },
-    { icon: 'briefcase', label: 'Employment details', meta: me.data?.jobTitle ?? '', color: palette.sage, bg: tint.sage },
-    // Documents feature has no backing data yet — no fake count.
-    { icon: 'doc', label: 'Documents & contracts', meta: '', color: palette.amber, bg: tint.amber },
-    { icon: 'wallet', label: 'Payslips', meta: payslipsMeta, color: palette.violet, bg: tint.violet },
-    { icon: 'gear', label: 'App settings', meta: '', color: palette.soft, bg: tint.neutral },
-    { icon: 'shield', label: 'Privacy & security', meta: '', color: palette.soft, bg: tint.neutral },
+    { icon: 'wallet', label: 'Payslips', meta: payslipsMeta, color: palette.violet, bg: tint.violet, href: '/payroll' },
+    { icon: 'leave', label: 'Leave', color: palette.coral, bg: tint.coral, href: '/leave' },
+    { icon: 'receipt', label: 'Claims', color: palette.amber, bg: tint.amber, href: '/claims' },
+    { icon: 'bell', label: 'Notifications', color: palette.sage, bg: tint.sage, href: '/notifications' },
   ];
 
   const onLogout = () => {
@@ -53,11 +59,6 @@ export default function Profile() {
     <CollapsingHeaderScreen
       bottomInset={70}
       title="Profile"
-      accessory={
-        <Pressable style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="edit" size={18} color={palette.soft} />
-        </Pressable>
-      }
     >
       {/* identity + stats */}
       <AsyncBoundary loading={me.isLoading} error={me.error} onRetry={me.refetch}>
@@ -90,15 +91,17 @@ export default function Profile() {
       {/* menu */}
       <Card padding={0} style={{ marginTop: 14, paddingHorizontal: 16 }}>
         {menu.map((m, i) => (
-          <View
+          <Pressable
             key={m.label}
+            accessibilityRole="button"
+            onPress={() => router.push(m.href)}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderTopColor: palette.line }}
           >
             <IconTile icon={m.icon} color={m.color} background={m.bg} size={36} iconSize={18} cornerRadius={11} />
             <Text style={[font(600), { flex: 1, fontSize: 13.5, color: palette.ink }]}>{m.label}</Text>
             {!!m.meta && <Text style={[font(600), { fontSize: 11.5, color: palette.faint }]}>{m.meta}</Text>}
             <Icon name="chevR" size={16} color={palette.faint} />
-          </View>
+          </Pressable>
         ))}
       </Card>
 

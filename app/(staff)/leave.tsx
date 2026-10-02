@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, type TextStyle } from 'react-native';
+import { View, Text, useWindowDimensions, type TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
@@ -8,10 +8,13 @@ import { useLeaveBalances, useLeaveRequests } from '@/api/queries';
 import { accentFromKey, statusAccent } from '@/api/accents';
 import type { LeaveBalance } from '@/api/types';
 import { formatDecimal } from '@/lib/numbers';
-import { palette, font, radius, tint } from '@/theme';
+import { palette, font, radius, spacing, tint } from '@/theme';
 
 /** Balances are fractional now — keep the digits aligned. */
 const NUM: TextStyle = { fontVariant: ['tabular-nums'] };
+
+/** Gap between balance tiles (both axes). */
+const GRID_GAP = 10;
 
 function balanceColor(b: LeaveBalance): string {
   return accentFromKey(b.colorKey).color;
@@ -42,6 +45,11 @@ export default function Leave() {
   const balances = useLeaveBalances();
   const requests = useLeaveRequests();
 
+  // Untracked types (accrual NONE, e.g. unpaid leave) have no balance to show.
+  const tiles = balances.data?.filter((b) => b.accrual !== 'NONE') ?? [];
+  const { width: screenWidth } = useWindowDimensions();
+  const tileWidth = Math.floor((screenWidth - spacing.screenX * 2 - GRID_GAP) / 2);
+
   const pendingCount = requests.data?.filter((r) => r.status.toUpperCase() === 'PENDING').length ?? 0;
   const subtitle = requests.data
     ? pendingCount > 0
@@ -63,33 +71,37 @@ export default function Leave() {
       >
         {balances.data && requests.data && (
           <>
-            {/* balances */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {balances.data.map((b) => {
-                const color = balanceColor(b);
-                // The pool is the full-year entitlement plus anything carried in.
-                const pool = num(b.entitled) + num(b.carriedForward);
-                const used = pool > 0 ? (pool - b.remaining) / pool : 0;
-                const note = balanceNote(b);
-                return (
-                  <Card key={b.leaveTypeId ?? b.code} padding={0} elevated={false} style={{ flex: 1, borderRadius: radius.xl, padding: 13, paddingTop: 14 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
-                      <Text style={[font(800), { fontSize: 24, color }, NUM]}>{formatDecimal(b.remaining)}</Text>
-                      <Text style={[font(600), { fontSize: 11, color: palette.faint, marginBottom: 3 }, NUM]}>
-                        /{formatDecimal(b.entitled)}
-                      </Text>
-                    </View>
-                    <Text style={[font(600), { fontSize: 11, color: palette.soft, marginTop: 8 }]}>{b.name}</Text>
-                    <ProgressBar value={used} color={color} />
-                    {note && (
-                      <Text style={[font(500), { fontSize: 10, color: palette.faint, marginTop: 6, lineHeight: 13 }, NUM]}>
-                        {note}
-                      </Text>
-                    )}
-                  </Card>
-                );
-              })}
-            </View>
+            {/* balances — two per row so type names never break mid-word */}
+            {tiles.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP }}>
+                {tiles.map((b) => {
+                  const color = balanceColor(b);
+                  // The pool is the full-year entitlement plus anything carried in.
+                  const pool = num(b.entitled) + num(b.carriedForward);
+                  const used = pool > 0 ? (pool - b.remaining) / pool : 0;
+                  const note = balanceNote(b);
+                  return (
+                    <Card key={b.leaveTypeId ?? b.code} padding={0} elevated={false} style={{ width: tileWidth, borderRadius: radius.xl, padding: 14 }}>
+                      <Text numberOfLines={2} style={[font(600), { fontSize: 12.5, lineHeight: 16, color: palette.soft }]}>{b.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 8 }}>
+                        <Text style={[font(800), { fontSize: 26, lineHeight: 32, letterSpacing: -0.6, color }, NUM]}>{formatDecimal(b.remaining)}</Text>
+                        <Text style={[font(600), { fontSize: 12, color: palette.faint }, NUM]}>
+                          / {formatDecimal(b.entitled)} days
+                        </Text>
+                      </View>
+                      <View style={{ marginTop: 10 }}>
+                        <ProgressBar value={used} color={color} />
+                      </View>
+                      {note && (
+                        <Text style={[font(500), { fontSize: 10.5, color: palette.faint, marginTop: 7, lineHeight: 14 }, NUM]}>
+                          {note}
+                        </Text>
+                      )}
+                    </Card>
+                  );
+                })}
+              </View>
+            )}
 
             <Button label="Apply for leave" icon="plus" style={{ marginTop: 16 }} onPress={() => router.push('/leave-apply')} />
 

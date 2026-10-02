@@ -8,6 +8,7 @@ import { Button, Icon } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
 import { isAdminRole } from '@/api/types';
+import { showInternalHints } from '@/lib/env';
 import { palette, font, radius, gradients } from '@/theme';
 
 function Field({
@@ -89,7 +90,7 @@ export default function Login() {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <LinearGradient colors={gradients.avatar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 34, height: 34, borderRadius: 10 }} />
-          <Text style={[font(800), { fontSize: 20, color: palette.ink, letterSpacing: -0.5 }]}>lumi</Text>
+          <Text style={[font(800), { fontSize: 20, color: palette.ink, letterSpacing: -0.5 }]}>Teamora</Text>
         </View>
         <Pressable onPress={() => router.back()}>
           <Text style={[font(600), { fontSize: 13, color: palette.faint }]}>Back</Text>
@@ -121,11 +122,14 @@ export default function Login() {
       </Pressable>
 
       <View style={{ marginTop: 'auto', paddingTop: 24, alignItems: 'center' }}>
-        <Text style={[font(500), { fontSize: 11.5, color: palette.faint, textAlign: 'center' }]}>
-          Demo — staff: amir@lumi.com · admin: sarah@lumi.com (password: password).
-        </Text>
-        <Text style={[font(500), { fontSize: 11, color: palette.faint, textAlign: 'center', marginTop: 6 }]}>
-          By continuing you agree to Lumi's Terms &amp; Privacy.
+        {/* Demo logins are an internal aid — never rendered in a production build. */}
+        {showInternalHints() && (
+          <Text style={[font(500), { fontSize: 11.5, color: palette.faint, textAlign: 'center', marginBottom: 6 }]}>
+            Demo — staff: amir@lumi.com · admin: sarah@lumi.com (password: password).
+          </Text>
+        )}
+        <Text style={[font(500), { fontSize: 11, color: palette.faint, textAlign: 'center' }]}>
+          By continuing you agree to Teamora's Terms &amp; Privacy.
         </Text>
       </View>
     </Screen>

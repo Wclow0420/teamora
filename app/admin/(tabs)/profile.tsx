@@ -7,9 +7,9 @@ import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { useAuth } from '@/hooks';
 import { useMe } from '@/api/queries';
 import type { Role } from '@/api/types';
-import { palette, font, radius, gradients, tint } from '@/theme';
+import { palette, font, gradients, tint } from '@/theme';
 
-type MenuItem = { icon: IconName; label: string; meta?: string; color: string; bg: string; href?: string };
+type MenuItem = { icon: IconName; label: string; meta?: string; color: string; bg: string; href: string };
 
 const ROLE_LABEL: Record<Role, string> = {
   OWNER: 'Owner',
@@ -23,14 +23,12 @@ export default function AdminProfile() {
   const { signOut } = useAuth();
   const me = useMe();
 
+  // Every row goes somewhere real — no chevron without a destination.
   const menu: MenuItem[] = [
     { icon: 'building', label: 'Company settings', meta: '', color: palette.coral, bg: tint.coral, href: '/admin/company-settings' },
     { icon: 'pin', label: 'Work locations', meta: '', color: palette.violet, bg: tint.violet, href: '/admin/work-locations' },
     { icon: 'calendar', label: 'Company calendar', meta: '', color: palette.amber, bg: tint.amber, href: '/admin/calendar-events' },
     { icon: 'users', label: 'Team members', meta: '', color: palette.sage, bg: tint.sage, href: '/admin/staff' },
-    { icon: 'user', label: 'Personal information', meta: '', color: palette.amber, bg: tint.amber },
-    { icon: 'gear', label: 'App settings', meta: '', color: palette.soft, bg: tint.neutral },
-    { icon: 'shield', label: 'Privacy & security', meta: '', color: palette.soft, bg: tint.neutral },
   ];
 
   const onLogout = () => {
@@ -42,11 +40,6 @@ export default function AdminProfile() {
     <CollapsingHeaderScreen
       bottomInset={70}
       title="Profile"
-      accessory={
-        <Pressable style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="edit" size={18} color={palette.soft} />
-        </Pressable>
-      }
     >
       <AsyncBoundary loading={me.isLoading} error={me.error} onRetry={me.refetch}>
         {me.data && (
@@ -82,8 +75,8 @@ export default function AdminProfile() {
         {menu.map((m, i) => (
           <Pressable
             key={m.label}
-            disabled={!m.href}
-            onPress={() => m.href && router.push(m.href as never)}
+            accessibilityRole="button"
+            onPress={() => router.push(m.href as never)}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderTopColor: palette.line }}
           >
             <IconTile icon={m.icon} color={m.color} background={m.bg} size={36} iconSize={18} cornerRadius={11} />

@@ -1,18 +1,40 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 export type TimerParts = { h: number; m: number; s: number };
 
+/** Whole seconds between an ISO instant and now — never negative, 0 if unparseable. */
+function elapsedSeconds(startIso: string | null | undefined): number {
+  if (!startIso) return 0;
+  const start = new Date(startIso).getTime();
+  if (Number.isNaN(start)) return 0;
+  return Math.max(0, Math.floor((Date.now() - start) / 1000));
+}
+
 /**
- * Counts up once per second from `baseSeconds`. Powers the live "currently
- * working" timer on the staff home screen. Returns split h/m/s parts.
+ * Live elapsed time since `startIso` (the clock-in instant), split into h/m/s.
+ *
+ * The value is always derived from the wall clock (`now − start`), never from a
+ * counter — so it is right the moment the screen opens, and stays right after
+ * the app has been backgrounded (timers are paused there; we also re-sync as
+ * soon as the app returns to the foreground). A null/invalid start yields 0:00:00.
  */
-export function useLiveTimer(baseSeconds = 6 * 3600 + 24 * 60): TimerParts {
-  const [seconds, setSeconds] = useState(baseSeconds);
+export function useLiveTimer(startIso: string | null | undefined): TimerParts {
+  const [seconds, setSeconds] = useState(() => elapsedSeconds(startIso));
 
   useEffect(() => {
-    const id = setInterval(() => setSeconds((x) => x + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
+    const sync = () => setSeconds(elapsedSeconds(startIso));
+    sync();
+    if (!startIso) return;
+    const id = setInterval(sync, 1000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sync();
+    });
+    return () => {
+      clearInterval(id);
+      sub.remove();
+    };
+  }, [startIso]);
 
   return {
     h: Math.floor(seconds / 3600),

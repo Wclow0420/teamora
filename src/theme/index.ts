@@ -3,7 +3,7 @@
  *   import { theme } from '@/theme';
  *   theme.colors.coral, theme.type.h1, theme.radius.card, ...
  */
-import { palette, tint, gradients, accents, accentTint } from './colors';
+import { palette, tint, gradients, accents, accentTint, onDark } from './colors';
 import { type, font, fontFamily } from './typography';
 import { spacing, radius, touchTarget } from './spacing';
 import { shadows } from './shadows';
@@ -12,6 +12,7 @@ export const theme = {
   colors: palette,
   tint,
   gradients,
+  onDark,
   accents,
   accentTint,
   type,
@@ -25,7 +26,7 @@ export const theme = {
 
 export type Theme = typeof theme;
 
-export { palette, tint, gradients, accents, accentTint } from './colors';
+export { palette, tint, gradients, accents, accentTint, onDark } from './colors';
 export { type, font, fontFamily } from './typography';
 export type { FontWeight } from './typography';
 export type { AccentKey } from './colors';
