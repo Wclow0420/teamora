@@ -37,7 +37,7 @@ public record PendingLeaveResponse(
         LeaveType t = r.getLeaveType();
         LeaveDurationUnit unit = r.getDurationUnit() == null ? LeaveDurationUnit.FULL_DAY : r.getDurationUnit();
         String balanceLabel = remaining == null
-                ? "No balance"
+                ? "Balance not opened yet"
                 : LeaveLabels.dayLabel(remaining) + " left";
         return new PendingLeaveResponse(
                 r.getId(),

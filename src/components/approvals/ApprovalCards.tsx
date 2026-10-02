@@ -27,7 +27,11 @@ export function DecideRow({ pending, onApprove, onReject }: DecideProps) {
         <Icon name="x" size={17} color={palette.danger} stroke={2.2} />
         <Text style={[font(700), { fontSize: 13.5, color: palette.danger }]}>Decline</Text>
       </Pressable>
-      <Button label="Approve" variant="success" icon="check" height={44} style={{ flex: 1.4 }} disabled={pending} onPress={onApprove} />
+      {/* Button is full-width by default, so the flex share lives on a wrapper —
+          otherwise it claims the whole row and squeezes Decline to a sliver. */}
+      <View style={{ flex: 1.4 }}>
+        <Button label="Approve" variant="success" icon="check" height={44} disabled={pending} onPress={onApprove} />
+      </View>
     </View>
   );
 }

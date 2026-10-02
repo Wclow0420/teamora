@@ -45,3 +45,15 @@ overtime form, claims form, notifications, change password, payroll month steppe
 Still not exercised on screen: completing a password reset/change, payroll
 run → approve → mark paid, approvals decide, camera capture (no camera on simulator),
 the offline retry screen. The demo notification seed still mentions "Bangsar South HQ".
+
+## Second pass — admin
+- **Decline button was a sliver.** `Button` is full-width by default, so in the approval
+  cards it took the whole row and squeezed Decline to an "×". The flex share now sits on
+  a wrapper `View`. Affected every leave / claim / overtime card in both apps.
+- Admin tab title "Approve" → "Approvals"; pending-leave label "No balance" (read as
+  zero days left) → "Balance not opened yet".
+- Verified: approve a leave on screen (count 7 → 6, balance 12 → 11.75 for 2 hours);
+  payroll approve is 403 for a manager, works for HR, and the employee then sees the
+  payslip; September run visible through the month stepper.
+- Dev data changed by this testing: Amir's 2 Oct 2-hour leave is now approved, the
+  September 2026 payroll run is APPROVED, and Amir has a 3 Oct attendance record.
