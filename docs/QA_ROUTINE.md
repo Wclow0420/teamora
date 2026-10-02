@@ -2988,3 +2988,23 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Admin → Payroll → step back a month and forward again.
 - **Expected:** Totals, status and breakdown are for the month shown; Run / Approve / Mark as paid act on that month; "next" is disabled at the current month.
 - [ ] Pass
+
+#### R3-11 — Data refreshes without restarting the app
+- **Steps:** On device A (admin) open Payroll and Approvals. On device B approve the payroll run and decide a request. On A, switch tabs, or background the app for 30+ seconds and return.
+- **Expected:** A shows the new status and counts without a restart.
+- [ ] Pass
+
+#### R3-12 — Decline asks first
+- **Steps:** Tap Decline on a leave, a claim and an overtime request; choose Cancel, then Decline.
+- **Expected:** "Decline this …?" appears each time; Cancel changes nothing; Decline removes the card and notifies the employee. Approve is a single tap. Decline and Approve are both full, readable buttons.
+- [ ] Pass
+
+#### R3-13 — "Today" is Malaysian time before 8 a.m.
+- **Steps:** Between midnight and 8 a.m., open the staff Calendar, the admin Schedule, and Payroll → Reports & export.
+- **Expected:** Today's date is highlighted correctly, the schedule opens on today, and the export timestamp shows local time.
+- [ ] Pass
+
+#### R3-14 — Statutory export rows
+- **Steps:** Admin → Payroll (a month with a run) → Reports & export → scroll to Export files.
+- **Expected:** Four rows, each with a name and description (Contribution summary, Bank payment, Full payroll, CP39) and a compact Export button; each opens the share sheet with a file. Header reads the month in words.
+- [ ] Pass

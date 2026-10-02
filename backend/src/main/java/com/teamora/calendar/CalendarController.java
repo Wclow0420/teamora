@@ -19,7 +19,7 @@ public class CalendarController {
     /** Month grid + upcoming list for the caller. `month` is "yyyy-MM" (defaults to current). */
     @GetMapping("/api/calendar")
     public MonthCalendarResponse calendar(@RequestParam(required = false) String month) {
-        YearMonth ym = month == null ? YearMonth.now() : YearMonth.parse(month);
+        YearMonth ym = month == null ? YearMonth.now(com.teamora.common.Zones.KL) : YearMonth.parse(month);
         return calendarService.month(currentEmployee.require(), ym);
     }
 }

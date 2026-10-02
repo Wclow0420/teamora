@@ -105,7 +105,7 @@ public class LeaveSeeder implements CommandLineRunner {
         LeaveBalance b = LeaveBalance.builder()
                 .employee(e)
                 .leaveType(type)
-                .leaveYear(LeaveYear.yearOf(LocalDate.now(), LeaveYear.DEFAULT_START_MONTH))
+                .leaveYear(LeaveYear.yearOf(LocalDate.now(com.teamora.common.Zones.KL), LeaveYear.DEFAULT_START_MONTH))
                 .entitled(new BigDecimal(entitled).setScale(2))
                 .carriedForward(BigDecimal.ZERO.setScale(2))
                 .used(new BigDecimal(used).setScale(2))

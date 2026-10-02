@@ -32,8 +32,8 @@ public class CompanyEventSeeder implements CommandLineRunner {
         }
         employees.findByEmailIgnoreCase("owner@lumi.com").ifPresent(owner -> {
             var company = owner.getCompany();
-            YearMonth ym = YearMonth.now();
-            int today = LocalDate.now().getDayOfMonth();
+            YearMonth ym = YearMonth.now(com.teamora.common.Zones.KL);
+            int today = LocalDate.now(com.teamora.common.Zones.KL).getDayOfMonth();
 
             // Spread across distinct days of the current month, clamped to valid days so
             // the grid always shows dots AND at least some events fall on/after today

@@ -14,6 +14,7 @@ import {
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import { queryClient } from '@/api/queryClient';
+import { QueryFreshness } from '@/api/QueryFreshness';
 import { NotificationListeners } from '@/notifications/NotificationListeners';
 import { palette } from '@/theme';
 
@@ -52,6 +53,7 @@ export default function RootLayout() {
             <Stack.Screen name="admin" />
             </Stack>
             <NotificationListeners />
+            <QueryFreshness />
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -133,7 +133,7 @@ public class LeaveService {
         int startMonth = leaveBalances.startMonth(employee.getCompany());
         int leaveYear = LeaveYear.yearOf(startDate, startMonth);
         BigDecimal remaining = leaveBalances.ensureBalance(employee, type, leaveYear)
-                .available(startMonth, LocalDate.now());
+                .available(startMonth, LocalDate.now(com.teamora.common.Zones.KL));
 
         BigDecimal pending = BigDecimal.ZERO;
         for (LeaveRequest r : requests.findByEmployeeAndTypeAndStatus(employee.getId(), type.getId(), LeaveStatus.PENDING)) {

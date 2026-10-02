@@ -49,10 +49,14 @@ public class ScheduleService {
         return new WeekScheduleResponse(weekLabel(weekStart, weekEnd), days);
     }
 
-    /** "16–22 June" — start day, end day, end month. */
+    /** "16–22 June", or "28 Sep – 4 Oct" when the week spans two months. */
     private String weekLabel(LocalDate start, LocalDate end) {
-        return start.getDayOfMonth() + "–" + end.getDayOfMonth() + " "
-                + end.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        if (start.getMonth() == end.getMonth()) {
+            return start.getDayOfMonth() + "–" + end.getDayOfMonth() + " "
+                    + end.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        }
+        return start.getDayOfMonth() + " " + start.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+                + " – " + end.getDayOfMonth() + " " + end.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
     }
 
     /** Upsert a shift for an employee on a date (employee must be in the company). */

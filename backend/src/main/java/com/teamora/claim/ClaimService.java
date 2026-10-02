@@ -41,7 +41,7 @@ public class ClaimService {
                 .map(Claim::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        LocalDate monthStart = LocalDate.now(com.teamora.common.Zones.KL).withDayOfMonth(1);
         LocalDate nextMonth = monthStart.plusMonths(1);
         BigDecimal reimbursed = mine.stream()
                 .filter(c -> c.getStatus() == ClaimStatus.APPROVED)

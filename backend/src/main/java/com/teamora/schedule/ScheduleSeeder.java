@@ -31,7 +31,7 @@ public class ScheduleSeeder implements CommandLineRunner {
         if (!props.seed() || shifts.count() > 0) {
             return;
         }
-        LocalDate monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate monday = LocalDate.now(com.teamora.common.Zones.KL).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate tuesday = monday.plusDays(1);
         LocalDate wednesday = monday.plusDays(2);
 

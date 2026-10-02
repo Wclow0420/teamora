@@ -69,7 +69,7 @@ export default function PayrollExport() {
 
   return (
     <Screen>
-      <ScreenHeader back title="Reports & export" subtitle={q.data?.period ?? period} />
+      <ScreenHeader back title="Reports & export" subtitle={q.data?.periodLabel ?? period} />
 
       <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
         {q.data && <SummaryTable data={q.data} />}
@@ -111,6 +111,7 @@ export default function PayrollExport() {
                     variant="light"
                     icon="download"
                     height={40}
+                    block={false}
                     disabled={pending !== null}
                     onPress={() => onExport(x.type)}
                   />

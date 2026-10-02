@@ -26,7 +26,7 @@ public class ScheduleController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         LocalDate start = weekStart != null
                 ? weekStart
-                : LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+                : LocalDate.now(com.teamora.common.Zones.KL).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         return scheduleService.week(currentEmployee.require().getCompany().getId(), start);
     }
 

@@ -10,6 +10,13 @@ import { accentFromKey } from '@/api/accents';
 import type { DayShifts } from '@/api/types';
 import { palette, font, radius, gradients, tint, shadows } from '@/theme';
 
+/** Today's local date as YYYY-MM-DD (matches the API's day keys). */
+function todayIso(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export default function Schedule() {
   const router = useRouter();
   const q = useSchedule();
@@ -18,7 +25,8 @@ export default function Schedule() {
   const days: DayShifts[] = q.data?.days ?? [];
   const selected: DayShifts | undefined = selectedDate
     ? days.find((d) => d.date === selectedDate)
-    : days.find((d) => d.shifts.length > 0) ?? days[0];
+    : // Open on today when it's in the week shown; otherwise the first day with shifts.
+      days.find((d) => d.date === todayIso()) ?? days.find((d) => d.shifts.length > 0) ?? days[0];
 
   return (
     <CollapsingHeaderScreen

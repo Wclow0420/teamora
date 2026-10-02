@@ -69,7 +69,7 @@ public class LeaveBalanceService {
 
     /** The leave year we are in today, for this company. */
     public int currentLeaveYear(Company company) {
-        return LeaveYear.yearOf(LocalDate.now(), startMonth(company));
+        return LeaveYear.yearOf(LocalDate.now(com.teamora.common.Zones.KL), startMonth(company));
     }
 
     /** The leave year containing {@code date}, for this company. */
@@ -83,8 +83,8 @@ public class LeaveBalanceService {
     @Transactional
     public List<LeaveBalanceResponse> balancesFor(Employee employee, Integer year) {
         int startMonth = startMonth(employee.getCompany());
-        int leaveYear = year != null ? year : LeaveYear.yearOf(LocalDate.now(), startMonth);
-        LocalDate today = LocalDate.now();
+        int leaveYear = year != null ? year : LeaveYear.yearOf(LocalDate.now(com.teamora.common.Zones.KL), startMonth);
+        LocalDate today = LocalDate.now(com.teamora.common.Zones.KL);
         return ensureBalances(employee, leaveYear).stream()
                 .map(b -> LeaveBalanceResponse.from(b, startMonth, today))
                 .toList();
@@ -104,7 +104,7 @@ public class LeaveBalanceService {
         int startMonth = startMonth(employee.getCompany());
         int leaveYear = LeaveYear.yearOf(onDate, startMonth);
         return balances.findByEmployeeIdAndLeaveTypeIdAndLeaveYear(employee.getId(), leaveTypeId, leaveYear)
-                .map(b -> b.available(startMonth, LocalDate.now()))
+                .map(b -> b.available(startMonth, LocalDate.now(com.teamora.common.Zones.KL)))
                 .orElse(null);
     }
 
@@ -208,7 +208,7 @@ public class LeaveBalanceService {
     @Transactional
     public void reprorateForJoinDateChange(Employee employee, LocalDate previousJoinDate) {
         int startMonth = startMonth(employee.getCompany());
-        int leaveYear = LeaveYear.yearOf(LocalDate.now(), startMonth);
+        int leaveYear = LeaveYear.yearOf(LocalDate.now(com.teamora.common.Zones.KL), startMonth);
         for (LeaveBalance b : balances.findByEmployeeIdAndLeaveYear(employee.getId(), leaveYear)) {
             if (b.isEntitlementOverridden()) {
                 continue;
@@ -246,12 +246,12 @@ public class LeaveBalanceService {
                 .orElseThrow(() -> ResourceNotFoundException.of("LeaveType", leaveTypeId));
 
         int startMonth = startMonth(caller.getCompany());
-        int leaveYear = year != null ? year : LeaveYear.yearOf(LocalDate.now(), startMonth);
+        int leaveYear = year != null ? year : LeaveYear.yearOf(LocalDate.now(com.teamora.common.Zones.KL), startMonth);
 
         LeaveBalance b = ensureBalance(employee, type, leaveYear);
         b.setEntitled(entitled.setScale(DAY_SCALE, RoundingMode.HALF_UP));
         b.setEntitlementOverridden(true);   // never auto-re-prorated from here on
-        return LeaveBalanceResponse.from(b, startMonth, LocalDate.now());
+        return LeaveBalanceResponse.from(b, startMonth, LocalDate.now(com.teamora.common.Zones.KL));
     }
 
     private Employee requireInCompany(Employee caller, UUID employeeId) {

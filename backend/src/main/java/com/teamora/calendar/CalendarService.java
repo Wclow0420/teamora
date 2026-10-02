@@ -78,7 +78,7 @@ public class CalendarService {
         }
 
         // Upcoming: company events from today onwards, soonest first, capped.
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(com.teamora.common.Zones.KL);
         List<UpcomingEvent> upcoming = events
                 .findByCompanyIdAndEventDateGreaterThanEqualOrderByEventDateAsc(companyId, today).stream()
                 .limit(UPCOMING_LIMIT)

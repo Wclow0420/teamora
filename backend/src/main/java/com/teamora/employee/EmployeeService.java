@@ -56,7 +56,7 @@ public class EmployeeService {
 
     /** Adds the effective schedule + indicative derived daily/hourly rates for the current month. */
     private EmployeeResponse toDetail(Employee e) {
-        CompensationService.Derivation d = compensationService.derive(e, YearMonth.now());
+        CompensationService.Derivation d = compensationService.derive(e, YearMonth.now(com.teamora.common.Zones.KL));
         return EmployeeResponse.withComp(e,
                 d.schedule().payBasis(),
                 d.schedule().workingDaysMask(),

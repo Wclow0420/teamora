@@ -59,7 +59,7 @@ public class CalendarAdminController {
 
     private static YearMonth parseMonth(String month) {
         if (month == null || month.isBlank()) {
-            return YearMonth.now();
+            return YearMonth.now(com.teamora.common.Zones.KL);
         }
         try {
             return YearMonth.parse(month);

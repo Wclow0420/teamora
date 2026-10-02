@@ -654,6 +654,8 @@ export type StatutorySummaryTotals = {
 /** On-screen statutory contribution summary for a period (persisted payslips). */
 export type StatutorySummary = {
   period: string;
+  /** e.g. "September 2026". */
+  periodLabel?: string;
   generatedAtLabel: string;
   rows: StatutorySummaryRow[];
   totals: StatutorySummaryTotals;

@@ -110,7 +110,7 @@ public class PayrollExportService {
         return new StatutorySummaryResponse(
                 resolved,
                 PayslipFormat.periodLabel(resolved),
-                java.time.LocalDateTime.now().format(GENERATED_AT),
+                java.time.LocalDateTime.now(com.teamora.common.Zones.KL).format(GENERATED_AT),
                 rows,
                 totals);
     }

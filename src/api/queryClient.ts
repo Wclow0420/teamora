@@ -5,7 +5,8 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       retry: 1,
-      refetchOnWindowFocus: false,
+      // "Window focus" = app foreground, wired up in QueryFreshness.
+      refetchOnWindowFocus: true,
     },
   },
 });

@@ -58,14 +58,16 @@ export function Screen({
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       automaticallyAdjustKeyboardInsets
-      contentContainerStyle={[{ paddingTop: padTop, paddingHorizontal: paddingX, paddingBottom: padBottom }, contentStyle]}
+      contentContainerStyle={[{ paddingTop: 6, paddingHorizontal: paddingX, paddingBottom: padBottom }, contentStyle]}
     >
       {children}
     </ScrollView>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    // The top inset sits on the frame, not the scroll content, so content clips
+    // at the safe-area edge instead of sliding under the clock and battery.
+    <View style={{ flex: 1, backgroundColor: background, paddingTop: insets.top }}>
       <StatusBar style={barStyle} />
       {Platform.OS === 'android' ? (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="height">
