@@ -16,9 +16,10 @@ import {
 } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { useApplyLeave, useLeaveTypes, useMe } from '@/api/queries';
-import { ApiError } from '@/api/client';
 import type { HalfDayPeriod, LeaveDurationUnit } from '@/api/types';
-import { formatDecimal, formatHours } from '@/lib/numbers';
+import { useLeaveBalanceCheck } from '@/hooks';
+import { errorMessage } from '@/lib/errors';
+import { formatDays, formatDecimal, formatHours } from '@/lib/numbers';
 import { palette, font, radius, tint } from '@/theme';
 
 const DURATION_OPTIONS: SelectOption<LeaveDurationUnit>[] = [
@@ -83,6 +84,20 @@ export default function LeaveApply() {
     return `${formatHours(hoursValue)} = ${formatDecimal(fraction)} day of your balance (${formatHours(hoursPerDay)} per day).`;
   }, [unit, hoursValue, hoursPerDay]);
 
+  const check = useLeaveBalanceCheck({
+    leaveTypeId,
+    unit,
+    start,
+    end,
+    hours: hoursValue,
+    hoursPerDay,
+    workingDaysMask: me.data?.workingDays,
+  });
+  const balanceError =
+    check.exceeds && check.balance && check.requestedDays != null
+      ? `That's ${formatDays(check.requestedDays)} — more than the ${formatDays(check.balance.remaining)} of ${check.balance.name} you have left.`
+      : null;
+
   const onStartChange = (d: Date) => {
     setStart(d);
     if (end < d) setEnd(d);
@@ -96,6 +111,7 @@ export default function LeaveApply() {
   };
 
   const onSubmit = async () => {
+    if (apply.isPending || balanceError) return;
     setError(null);
     if (!leaveTypeId) {
       setError('Please choose a leave type.');
@@ -129,7 +145,8 @@ export default function LeaveApply() {
       });
       router.back();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
+      // Overlap / balance rejections come back as plain sentences — show them as-is.
+      setError(errorMessage(e));
     }
   };
 
@@ -157,6 +174,32 @@ export default function LeaveApply() {
                 <Text style={[font(600), { flex: 1, fontSize: 12.5, color: palette.soft, lineHeight: 18 }]}>
                   This leave is unpaid — salary will be deducted for the time taken.
                 </Text>
+              </View>
+            )}
+
+            {check.balance && (
+              <View
+                accessibilityLiveRegion="polite"
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 9,
+                  padding: 13,
+                  borderRadius: radius.lg,
+                  backgroundColor: balanceError ? tint.danger : tint.sage,
+                }}
+              >
+                <Icon name="leave" size={17} color={balanceError ? palette.danger : palette.sage} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[font(700), { fontSize: 12.5, lineHeight: 18, color: palette.ink, fontVariant: ['tabular-nums'] }]}>
+                    {formatDays(check.balance.remaining)} available
+                  </Text>
+                  {check.hasPending && (
+                    <Text style={[font(500), { fontSize: 11.5, lineHeight: 16, color: palette.soft, marginTop: 2 }]}>
+                      Your pending {check.balance.name} requests also count against this.
+                    </Text>
+                  )}
+                </View>
               </View>
             )}
 
@@ -197,12 +240,16 @@ export default function LeaveApply() {
 
             <TextField label="Reason (optional)" value={reason} onChangeText={setReason} multiline />
 
-            {error && <Text style={{ fontSize: 13, color: palette.danger }}>{error}</Text>}
+            {balanceError ? (
+              <Text style={[font(600), { fontSize: 12.5, lineHeight: 18, color: palette.danger }]}>{balanceError}</Text>
+            ) : (
+              error && <Text style={[font(600), { fontSize: 12.5, lineHeight: 18, color: palette.danger }]}>{error}</Text>
+            )}
 
             <Button
               label={apply.isPending ? 'Submitting…' : 'Submit request'}
               onPress={onSubmit}
-              disabled={apply.isPending}
+              disabled={apply.isPending || !!balanceError}
               style={{ marginTop: 4 }}
             />
           </View>

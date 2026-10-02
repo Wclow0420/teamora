@@ -10,7 +10,9 @@ import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
 import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
+import com.teamora.leave.LeaveBalanceService;
 import com.teamora.location.WorkLocation;
+import com.teamora.notification.PushTokenRepository;
 import com.teamora.location.WorkLocationRepository;
 import com.teamora.payroll.CompensationService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +38,8 @@ public class EmployeeService {
     private final RefreshTokenRepository refreshTokens;
     private final CompensationService compensationService;
     private final WorkLocationRepository workLocations;
+    private final LeaveBalanceService leaveBalances;
+    private final PushTokenRepository pushTokens;
 
     /** Directory listing — scoped to the caller's company. */
     public List<EmployeeResponse> search(UUID companyId, String department, String query) {
@@ -84,8 +89,8 @@ public class EmployeeService {
                 .role(req.role())
                 .jobTitle(req.jobTitle())
                 .department(req.department())
-                .staffId(req.staffId())
-                .phone(req.phone())
+                .staffId(uniqueStaffId(company.getId(), req.staffId(), null))
+                .phone(trimToNull(req.phone()))
                 .joinDate(req.joinDate())
                 .monthlySalary(req.monthlySalary())
                 .maritalStatus(req.maritalStatus())
@@ -100,7 +105,6 @@ public class EmployeeService {
                 .taxNo(trimToNull(req.taxNo()))
                 .bankName(trimToNull(req.bankName()))
                 .bankAccountNo(trimToNull(req.bankAccountNo()))
-                .location(company.getName())
                 .active(true)
                 .build();
         e.setCompany(company);
@@ -135,8 +139,14 @@ public class EmployeeService {
         if (req.jobTitle() != null) e.setJobTitle(req.jobTitle().isBlank() ? null : req.jobTitle().trim());
         if (req.department() != null) e.setDepartment(req.department().isBlank() ? null : req.department().trim());
         if (req.phone() != null) e.setPhone(req.phone().isBlank() ? null : req.phone().trim());
-        if (req.staffId() != null) e.setStaffId(req.staffId().isBlank() ? null : req.staffId().trim());
-        if (req.joinDate() != null) e.setJoinDate(req.joinDate());
+        if (req.staffId() != null) e.setStaffId(uniqueStaffId(companyId, req.staffId(), e.getId()));
+        if (req.joinDate() != null && !req.joinDate().equals(e.getJoinDate())) {
+            LocalDate previousJoinDate = e.getJoinDate();
+            e.setJoinDate(req.joinDate());
+            // First-year leave is prorated from the join date — keep this leave year's
+            // (non-overridden) entitlements in step with the corrected date.
+            leaveBalances.reprorateForJoinDateChange(e, previousJoinDate);
+        }
         if (req.monthlySalary() != null) e.setMonthlySalary(req.monthlySalary());
         if (req.maritalStatus() != null) e.setMaritalStatus(req.maritalStatus());
         if (req.spouseWorking() != null) e.setSpouseWorking(req.spouseWorking());
@@ -235,8 +245,14 @@ public class EmployeeService {
         if (e.getRole() == Role.OWNER && caller.getRole() != Role.OWNER) {
             throw new AccessDeniedException("Only the owner can reset the owner's password");
         }
+        if (e.getId().equals(caller.getId())) {
+            // Changing your own password must prove you know the current one.
+            throw new BadRequestException("Use Change password to change your own password");
+        }
         e.setPasswordHash(passwordEncoder.encode(newPassword));
         refreshTokens.revokeAllForEmployee(e.getId(), "");
+        // Their devices are being signed out — stop pushing this account's alerts to them.
+        pushTokens.deleteByEmployeeId(e.getId());
     }
 
     // ---- helpers ----
@@ -246,6 +262,24 @@ public class EmployeeService {
         if (s == null) return null;
         String t = s.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    /**
+     * Normalise a staff id (blank → null) and make sure no one else in the company
+     * already uses it. {@code selfIdOrNull} is the employee being edited, if any.
+     */
+    private String uniqueStaffId(UUID companyId, String raw, UUID selfIdOrNull) {
+        String staffId = trimToNull(raw);
+        if (staffId == null) {
+            return null;
+        }
+        boolean taken = selfIdOrNull == null
+                ? employees.existsByCompanyIdAndStaffIdIgnoreCase(companyId, staffId)
+                : employees.existsByCompanyIdAndStaffIdIgnoreCaseAndIdNot(companyId, staffId, selfIdOrNull);
+        if (taken) {
+            throw new BadRequestException("Staff ID " + staffId + " is already used by someone else in your company");
+        }
+        return staffId;
     }
 
     private void rejectOwnerRole(Role role) {

@@ -5,6 +5,7 @@ import { Screen } from '@/components/layout/Screen';
 import { ScreenHeader, Button, TextField, SelectChips, type SelectOption } from '@/components/ui';
 import { useCreateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
+import { PASSWORD_HELPER, passwordError } from '@/lib/password';
 import type { Role } from '@/api/types';
 import { palette, font, spacing } from '@/theme';
 
@@ -32,12 +33,19 @@ export default function EmployeeNew() {
   const [role, setRole] = useState<NewRole>('EMPLOYEE');
   const [jobTitle, setJobTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [passwordFieldError, setPasswordFieldError] = useState<string | null>(null);
 
   const onSubmit = async () => {
     if (create.isPending) return;
     setError(null);
+    setPasswordFieldError(null);
     if (!fullName.trim() || !email.trim() || !password) {
       setError('Name, email and password are required.');
+      return;
+    }
+    const rule = passwordError(password);
+    if (rule) {
+      setPasswordFieldError(rule);
       return;
     }
     try {
@@ -78,7 +86,16 @@ export default function EmployeeNew() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextField label="Temporary password" icon="lock" value={password} onChangeText={setPassword} secure />
+        <TextField
+          label="Temporary password"
+          icon="lock"
+          value={password}
+          onChangeText={setPassword}
+          secure
+          autoCapitalize="none"
+          helper={PASSWORD_HELPER}
+          error={passwordFieldError}
+        />
         <SelectChips label="Role" options={ROLE_OPTIONS} value={role} onChange={setRole} />
         <TextField
           label="Job title (optional)"

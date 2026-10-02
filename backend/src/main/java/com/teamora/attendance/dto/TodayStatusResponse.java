@@ -4,6 +4,9 @@ import com.teamora.attendance.AttendanceRecord;
 import com.teamora.attendance.AttendanceStatus;
 
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /** Home hero: where the current employee stands today. */
 public record TodayStatusResponse(
@@ -13,17 +16,23 @@ public record TodayStatusResponse(
         String shift,
         String location
 ) {
-    private static final String DEFAULT_SHIFT = "9:00 AM – 6:00 PM";
+    private static final DateTimeFormatter H_MM_A = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
 
-    public static TodayStatusResponse from(AttendanceRecord r) {
+    /**
+     * @param workStart the company's configured work start time — the only shift
+     *                  fact we actually know, so the label is "starts 9:00 AM"
+     *                  rather than an invented start–end range.
+     */
+    public static TodayStatusResponse from(AttendanceRecord r, LocalTime workStart) {
+        String shift = workStart == null ? null : "starts " + workStart.format(H_MM_A);
         if (r == null) {
-            return new TodayStatusResponse(AttendanceStatus.ABSENT, null, null, DEFAULT_SHIFT, null);
+            return new TodayStatusResponse(AttendanceStatus.ABSENT, null, null, shift, null);
         }
         return new TodayStatusResponse(
                 r.getStatus(),
                 r.getClockInAt(),
                 r.getWorkedMinutes(),
-                DEFAULT_SHIFT,
+                shift,
                 r.getLocation()
         );
     }

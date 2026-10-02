@@ -27,7 +27,7 @@ export default function Schedule() {
       title="Scheduling"
       subtitle={q.data ? `Week of ${q.data.weekLabel}` : 'Scheduling'}
       accessory={
-        <Pressable onPress={() => router.push('/admin/shift-assign')} hitSlop={6}>
+        <Pressable onPress={() => router.push('/admin/shift-assign')} hitSlop={6} accessibilityRole="button" accessibilityLabel="Assign a shift">
           <LinearGradient colors={gradients.coral} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, shadows.coral]}>
             <Icon name="plus" size={22} color={palette.white} />
           </LinearGradient>
@@ -53,6 +53,7 @@ export default function Schedule() {
                 <Pressable
                   key={d.date}
                   onPress={() => setSelectedDate(d.date)}
+                  accessibilityRole="button"
                   style={{ flex: 1, paddingVertical: 10, borderRadius: 13, alignItems: 'center', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line }}
                 >
                   {inner}

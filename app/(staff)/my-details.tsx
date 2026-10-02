@@ -37,7 +37,7 @@ function detailRows(e: EmployeeResponse): Row[] {
     { icon: 'building', label: 'Department', value: e.department },
     // No reporting manager → requests route to the company owner (a real rule, not a blank).
     { icon: 'users', label: 'Reporting manager', value: e.reportingManagerName ?? 'Company owner approves' },
-    { icon: 'pin', label: 'Work location', value: e.workLocationName ?? e.location },
+    { icon: 'pin', label: 'Work location', value: e.workLocationName },
     { icon: 'calendar', label: 'Joined', value: formatJoinDate(e.joinDate) },
     { icon: 'shield', label: 'Role', value: ROLE_LABEL[e.role] },
   ];

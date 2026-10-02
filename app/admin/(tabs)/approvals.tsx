@@ -10,14 +10,8 @@ import {
   LeaveApprovalCard,
   OvertimeApprovalCard,
 } from '@/components/approvals/ApprovalCards';
-import {
-  usePendingClaims,
-  usePendingLeave,
-  usePendingOvertime,
-  useDecideClaim,
-  useDecideLeave,
-  useDecideOvertime,
-} from '@/api/queries';
+import { usePendingClaims, usePendingLeave, usePendingOvertime } from '@/api/queries';
+import { useApprovalDecisions } from '@/hooks';
 import { palette, tint } from '@/theme';
 
 type Tab = 'leave' | 'claims' | 'ot';
@@ -27,9 +21,7 @@ export default function Approvals() {
   const leave = usePendingLeave();
   const claims = usePendingClaims();
   const ot = usePendingOvertime();
-  const decideLeave = useDecideLeave();
-  const decideClaim = useDecideClaim();
-  const decideOt = useDecideOvertime();
+  const decisions = useApprovalDecisions();
 
   const total = (leave.data?.length ?? 0) + (claims.data?.length ?? 0) + (ot.data?.length ?? 0);
   const tabs = [
@@ -59,9 +51,9 @@ export default function Approvals() {
             ) : (
               <View style={{ gap: 12 }}>
                 {leave.data.map((p) => (
-                  <LeaveApprovalCard key={p.id} item={p} pending={decideLeave.isPending}
-                    onApprove={() => decideLeave.mutateAsync({ id: p.id, decision: 'approve' })}
-                    onReject={() => decideLeave.mutateAsync({ id: p.id, decision: 'reject' })} />
+                  <LeaveApprovalCard key={p.id} item={p} pending={decisions.leavePending}
+                    onApprove={() => decisions.decideLeave(p.id, 'approve')}
+                    onReject={() => decisions.decideLeave(p.id, 'reject')} />
                 ))}
               </View>
             ))}
@@ -76,9 +68,9 @@ export default function Approvals() {
             ) : (
               <View style={{ gap: 12 }}>
                 {claims.data.map((c) => (
-                  <ClaimApprovalCard key={c.id} item={c} pending={decideClaim.isPending}
-                    onApprove={() => decideClaim.mutateAsync({ id: c.id, decision: 'approve' })}
-                    onReject={() => decideClaim.mutateAsync({ id: c.id, decision: 'reject' })} />
+                  <ClaimApprovalCard key={c.id} item={c} pending={decisions.claimPending}
+                    onApprove={() => decisions.decideClaim(c.id, 'approve')}
+                    onReject={() => decisions.decideClaim(c.id, 'reject')} />
                 ))}
               </View>
             ))}
@@ -93,9 +85,9 @@ export default function Approvals() {
             ) : (
               <View style={{ gap: 12 }}>
                 {ot.data.map((o) => (
-                  <OvertimeApprovalCard key={o.id} item={o} pending={decideOt.isPending}
-                    onApprove={() => decideOt.mutateAsync({ id: o.id, decision: 'approve' })}
-                    onReject={() => decideOt.mutateAsync({ id: o.id, decision: 'reject' })} />
+                  <OvertimeApprovalCard key={o.id} item={o} pending={decisions.overtimePending}
+                    onApprove={() => decisions.decideOvertime(o.id, 'approve')}
+                    onReject={() => decisions.decideOvertime(o.id, 'reject')} />
                 ))}
               </View>
             ))}

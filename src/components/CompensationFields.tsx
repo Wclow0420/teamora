@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Card, SelectChips, TextField, WeekdayToggles, type SelectOption } from '@/components/ui';
 import type { PayBasis } from '@/api/types';
-import { deriveRates, describeMask } from '@/lib/workweek';
+import { NO_WORKING_DAYS_ERROR, deriveRates, describeMask, isEmptyMask } from '@/lib/workweek';
 import { palette, font, radius, tint } from '@/theme';
 
 const PAY_BASIS_OPTIONS: SelectOption<PayBasis>[] = [
@@ -63,7 +63,12 @@ export function CompensationFields({
       </Text>
 
       <SelectChips label="Pay basis" options={PAY_BASIS_OPTIONS} value={payBasis} onChange={onPayBasis} />
-      <WeekdayToggles label="Working days" value={workingDays} onChange={onWorkingDays} />
+      <WeekdayToggles
+        label="Working days"
+        value={workingDays}
+        onChange={onWorkingDays}
+        error={isEmptyMask(workingDays) ? NO_WORKING_DAYS_ERROR : null}
+      />
       <TextField
         label="Hours per day"
         value={hoursPerDay}

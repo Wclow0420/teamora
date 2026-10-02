@@ -1,37 +1,50 @@
-import React from 'react';
-import { View, Text, Modal, Pressable, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text } from 'react-native';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
-import { Card, Chip, EmptyState, Icon, LiveDot, Placeholder, StatTile } from '@/components/ui';
+import { Card, Chip, EmptyState, LiveDot, SelectChips, StatTile, type SelectOption } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { SelfieThumb } from '@/components/attendance/SelfieThumb';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { useLiveAttendance } from '@/api/queries';
 import { attendanceApi } from '@/api/endpoints';
-import { getAccessToken } from '@/api/tokenStore';
 import { accentFromKey } from '@/api/accents';
-import { palette, font, radius, tint } from '@/theme';
+import { liveStatusLabel, matchesLiveFilter, type LiveFilter } from '@/lib/liveAttendance';
+import { summaryLine } from '@/lib/employeeFields';
+import { palette, font, tint } from '@/theme';
 
-const PINS: { x: `${number}%`; y: `${number}%`; color: string }[] = [
-  { x: '30%', y: '40%', color: palette.sage },
-  { x: '58%', y: '55%', color: palette.violet },
-  { x: '70%', y: '35%', color: palette.amber },
-  { x: '44%', y: '68%', color: palette.sage },
+const FILTERS: SelectOption<LiveFilter>[] = [
+  { value: 'all', label: 'All' },
+  { value: 'in', label: 'In' },
+  { value: 'remote', label: 'Remote' },
+  { value: 'late', label: 'Late' },
+  { value: 'out', label: 'Out' },
 ];
 
-const FILTERS = ['All', 'In office', 'Remote', 'Late'];
+/** What the empty list says for each filter. */
+const EMPTY_COPY: Record<LiveFilter, { title: string; subtitle: string }> = {
+  all: { title: 'No active staff yet', subtitle: 'Add your team under Staff and they will appear here as they clock in.' },
+  in: { title: 'Nobody clocked in yet', subtitle: 'People appear here as they check in for the day.' },
+  remote: { title: 'Nobody working remotely', subtitle: 'Remote clock-ins for today will show up here.' },
+  late: { title: 'Nobody is late', subtitle: 'Everyone who has clocked in today was on time.' },
+  out: { title: 'Nobody is out', subtitle: 'No one is on leave or yet to clock in.' },
+};
 
 export default function Live() {
   const q = useLiveAttendance();
-  const counts = q.data?.counts ?? { inOffice: 0, remote: 0, late: 0, out: 0 };
+  const [filter, setFilter] = useState<LiveFilter>('all');
   // The selfie the admin is viewing enlarged (null → viewer closed).
-  const [viewer, setViewer] = React.useState<{ recordId: string; name: string } | null>(null);
-  const token = getAccessToken();
+  const [viewer, setViewer] = useState<{ recordId: string; name: string } | null>(null);
 
+  const counts = q.data?.counts;
+  const stat = (n: number | undefined) => (n == null ? '—' : String(n));
   const stats: { label: string; value: string; color: string }[] = [
-    { label: 'In', value: String(counts.inOffice), color: palette.sage },
-    { label: 'Remote', value: String(counts.remote), color: palette.violet },
-    { label: 'Late', value: String(counts.late), color: palette.amber },
-    { label: 'Out', value: String(counts.out), color: palette.coral },
+    { label: 'In', value: stat(counts?.inOffice), color: palette.sage },
+    { label: 'Remote', value: stat(counts?.remote), color: palette.violet },
+    { label: 'Late', value: stat(counts?.late), color: palette.amber },
+    { label: 'Out', value: stat(counts?.out), color: palette.coral },
   ];
+
+  const rows = (q.data?.staff ?? []).filter((row) => matchesLiveFilter(row, filter));
 
   return (
     <CollapsingHeaderScreen
@@ -41,168 +54,75 @@ export default function Live() {
       subtitle="Updates every 30s"
       accessory={<Chip label="LIVE" color={palette.sage} background={tint.sage} leading={<LiveDot color={palette.sage} />} />}
       headerExtra={
-        <View style={{ marginTop: 16 }}>
-      {/* stat row */}
-      <View style={{ flexDirection: 'row', gap: 9 }}>
-        {stats.map((s) => (
-          <StatTile key={s.label} value={s.value} label={s.label} color={s.color} />
-        ))}
-      </View>
-
-      {/* mini map */}
-      <View style={{ marginTop: 13, height: 120, borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: palette.line }}>
-        <Placeholder label="office floor map" radius={0} tintColor="rgba(236,106,77,0.07)" />
-        <View
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            width: 84,
-            height: 84,
-            marginLeft: -42,
-            marginTop: -42,
-            borderRadius: radius.pill,
-            borderWidth: 2,
-            borderColor: palette.sage,
-            borderStyle: 'dashed',
-          }}
-        />
-        {PINS.map((p, i) => (
-          <View key={i} style={{ position: 'absolute', left: p.x, top: p.y, marginLeft: -10, marginTop: -20 }}>
-            <Icon name="pin" size={20} stroke={2.3} color={p.color} />
+        <View style={{ marginTop: 16, gap: 14 }}>
+          <View style={{ flexDirection: 'row', gap: 9 }}>
+            {stats.map((s) => (
+              <StatTile key={s.label} value={s.value} label={s.label} color={s.color} />
+            ))}
           </View>
-        ))}
-        <View
-          style={{
-            position: 'absolute',
-            left: 12,
-            top: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            backgroundColor: palette.white,
-            borderRadius: 9,
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderWidth: 1,
-            borderColor: palette.line,
-          }}
-        >
-          <Icon name="building" size={13} color={palette.coral} />
-          <Text style={[font(700), { fontSize: 11, color: palette.ink }]}>Bangsar South HQ</Text>
-        </View>
-      </View>
-
-      {/* filters */}
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 12 }}>
-        {FILTERS.map((f, i) => {
-          const active = i === 0;
-          return (
-            <Chip
-              key={f}
-              label={f}
-              color={active ? palette.white : palette.soft}
-              background={active ? palette.ink : palette.surface}
-              style={
-                active
-                  ? { paddingVertical: 8, paddingHorizontal: 14 }
-                  : { paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: palette.line }
-              }
-            />
-          );
-        })}
-      </View>
+          <SelectChips options={FILTERS} value={filter} onChange={setFilter} />
         </View>
       }
     >
-      {/* staff list */}
       <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
-        {q.data && (q.data.staff.length === 0 ? (
-          <EmptyState
-            icon="pin"
-            title="Nobody clocked in yet"
-            subtitle="Live attendance appears here as your team checks in for the day."
-          />
-        ) : (
-          <Card padding={0}>
-            {q.data.staff.map((row, i) => {
-              const accent = accentFromKey(row.accentColorKey);
-              return (
-                <View
-                  key={row.employeeId}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                    paddingVertical: 11,
-                    paddingHorizontal: 16,
-                    borderTopWidth: i ? 1 : 0,
-                    borderTopColor: palette.line,
-                  }}
-                >
-                  <SelfieThumb
-                    recordId={row.attendanceRecordId}
-                    hasPhoto={row.hasPhoto}
-                    initial={row.initial}
-                    tint={{ bg: accent.bg, fg: accent.color }}
-                    size={38}
-                    onPress={
-                      row.hasPhoto && row.attendanceRecordId
-                        ? () => setViewer({ recordId: row.attendanceRecordId as string, name: row.name })
-                        : undefined
-                    }
-                  />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[font(700), { fontSize: 13, color: palette.ink }]} numberOfLines={1}>{row.name}</Text>
-                    <Text style={[font(500), { fontSize: 11, color: palette.faint, marginTop: 5 }]} numberOfLines={1}>{row.department}</Text>
+        {q.data &&
+          (rows.length === 0 ? (
+            <EmptyState icon="pin" title={EMPTY_COPY[filter].title} subtitle={EMPTY_COPY[filter].subtitle} />
+          ) : (
+            <Card padding={0}>
+              {rows.map((row, i) => {
+                const accent = accentFromKey(row.accentColorKey);
+                const recordId = row.hasPhoto ? row.attendanceRecordId : null;
+                // Department + the real site they clocked in at — each only when there is one.
+                const meta = summaryLine([row.department, row.location]);
+                return (
+                  <View
+                    key={row.employeeId}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      paddingVertical: 11,
+                      paddingHorizontal: 16,
+                      borderTopWidth: i ? 1 : 0,
+                      borderTopColor: palette.line,
+                    }}
+                  >
+                    <SelfieThumb
+                      recordId={row.attendanceRecordId}
+                      hasPhoto={row.hasPhoto}
+                      initial={row.initial}
+                      name={row.name}
+                      tint={{ bg: accent.bg, fg: accent.color }}
+                      size={38}
+                      onPress={recordId ? () => setViewer({ recordId, name: row.name }) : undefined}
+                    />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[font(700), { fontSize: 13, color: palette.ink }]} numberOfLines={1}>{row.name}</Text>
+                      {meta && (
+                        <Text style={[font(500), { fontSize: 11, color: palette.faint, marginTop: 5 }]} numberOfLines={1}>{meta}</Text>
+                      )}
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Chip label={liveStatusLabel(row.status)} color={accent.color} background={accent.bg} size="sm" />
+                      <Text style={[font(600), { fontSize: 10.5, color: palette.faint, marginTop: 5, fontVariant: ['tabular-nums'] }]}>{row.time}</Text>
+                    </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Chip label={row.status} color={accent.color} background={accent.bg} size="sm" />
-                    <Text style={[font(600), { fontSize: 10.5, color: palette.faint, marginTop: 5 }]}>{row.time}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </Card>
-        ))}
+                );
+              })}
+            </Card>
+          ))}
       </AsyncBoundary>
 
-      {/* enlarged selfie viewer */}
-      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
-        <Pressable
-          onPress={() => setViewer(null)}
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(28,22,16,0.88)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 24,
-          }}
-        >
-          {viewer && token && (
-            <>
-              <Image
-                source={{
-                  uri: attendanceApi.photoUrl(viewer.recordId),
-                  headers: { Authorization: `Bearer ${token}` },
-                }}
-                resizeMode="cover"
-                style={{
-                  width: '86%',
-                  aspectRatio: 1,
-                  maxWidth: 360,
-                  borderRadius: radius.hero,
-                  backgroundColor: palette.surfaceSunken,
-                }}
-              />
-              <Text style={[font(700), { fontSize: 15, color: palette.white, marginTop: 16 }]}>{viewer.name}</Text>
-              <Text style={[font(500), { fontSize: 12, color: palette.white, opacity: 0.6, marginTop: 4 }]}>
-                Clock-in photo · tap to close
-              </Text>
-            </>
-          )}
-        </Pressable>
-      </Modal>
+      {/* enlarged clock-in selfie */}
+      <PhotoViewer
+        visible={!!viewer}
+        onClose={() => setViewer(null)}
+        uri={viewer ? attendanceApi.photoUrl(viewer.recordId) : null}
+        authed
+        title={viewer?.name}
+        caption="Clock-in photo"
+      />
     </CollapsingHeaderScreen>
   );
 }

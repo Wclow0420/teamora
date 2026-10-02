@@ -1,5 +1,6 @@
 package com.teamora.company;
 
+import com.teamora.common.exception.BadRequestException;
 import com.teamora.company.dto.CompanyDtos.UpdateCompanyRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,12 @@ public class CompanyService {
 
     @Transactional
     public Company update(Company company, UpdateCompanyRequest req) {
-        if (req.name() != null && !req.name().isBlank()) company.setName(req.name().trim());
+        if (req.name() != null) {
+            if (req.name().isBlank()) {
+                throw new BadRequestException("Company name can't be blank");
+            }
+            company.setName(req.name().trim());
+        }
         if (req.registrationNo() != null) company.setRegistrationNo(req.registrationNo());
         if (req.epfNo() != null) company.setEpfNo(req.epfNo());
         if (req.socsoNo() != null) company.setSocsoNo(req.socsoNo());

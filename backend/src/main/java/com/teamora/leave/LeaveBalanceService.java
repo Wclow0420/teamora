@@ -146,7 +146,7 @@ public class LeaveBalanceService {
                 .employee(employee)
                 .leaveType(type)
                 .leaveYear(leaveYear)
-                .entitled(entitlementFor(employee, type, leaveYear, startMonth))
+                .entitled(entitlementFor(employee.getJoinDate(), type, leaveYear, startMonth))
                 .carriedForward(carryForwardInto(employee, type, leaveYear))
                 .used(BigDecimal.ZERO.setScale(DAY_SCALE))
                 .build();
@@ -157,9 +157,8 @@ public class LeaveBalanceService {
     // ---------- entitlement math ----------
 
     /** Full-year entitlement, prorated when the employee joined during this leave year. */
-    BigDecimal entitlementFor(Employee employee, LeaveType type, int leaveYear, int startMonth) {
+    BigDecimal entitlementFor(LocalDate joinDate, LeaveType type, int leaveYear, int startMonth) {
         BigDecimal full = BigDecimal.valueOf(type.getDefaultEntitlementDays()).setScale(DAY_SCALE);
-        LocalDate joinDate = employee.getJoinDate();
         if (joinDate == null || full.signum() == 0) {
             return full;
         }
@@ -186,6 +185,48 @@ public class LeaveBalanceService {
                 .orElse(BigDecimal.ZERO.setScale(DAY_SCALE));
     }
 
+    // ---------- join-date change ----------
+
+    /**
+     * An admin corrected {@code employee}'s join date (already set on the entity;
+     * {@code previousJoinDate} is what it was). Re-prorate the employee's balance rows
+     * for the <b>current leave year</b> so first-year entitlement follows the new date.
+     *
+     * <p>A row is left alone when an admin has overridden it, detected two ways:
+     * <ol>
+     *   <li>{@link LeaveBalance#isEntitlementOverridden()} — set by {@link #override}
+     *       (rows overridden since V18);</li>
+     *   <li>its {@code entitled} no longer equals what the proration formula gives for
+     *       the <i>previous</i> join date — which catches overrides made before the flag
+     *       existed, seeded demo balances, and rows provisioned under an older leave-type
+     *       default. When in doubt we keep the number a human can see today.</li>
+     * </ol>
+     * A re-proration never drops the entitlement below the days already used (clamped),
+     * and never raises it as a side effect of that clamp. Rows not provisioned yet need
+     * nothing — they are created lazily from the new join date.
+     */
+    @Transactional
+    public void reprorateForJoinDateChange(Employee employee, LocalDate previousJoinDate) {
+        int startMonth = startMonth(employee.getCompany());
+        int leaveYear = LeaveYear.yearOf(LocalDate.now(), startMonth);
+        for (LeaveBalance b : balances.findByEmployeeIdAndLeaveYear(employee.getId(), leaveYear)) {
+            if (b.isEntitlementOverridden()) {
+                continue;
+            }
+            LeaveType type = b.getLeaveType();
+            BigDecimal current = b.entitledOrZero();
+            BigDecimal expectedBefore = entitlementFor(previousJoinDate, type, leaveYear, startMonth);
+            if (current.compareTo(expectedBefore) != 0) {
+                continue;   // hand-set (pre-flag override / seed) — don't clobber it
+            }
+            BigDecimal next = entitlementFor(employee.getJoinDate(), type, leaveYear, startMonth);
+            if (next.compareTo(current) < 0) {
+                next = next.max(b.usedOrZero().min(current));
+            }
+            b.setEntitled(next.setScale(DAY_SCALE, RoundingMode.HALF_UP));
+        }
+    }
+
     // ---------- admin override ----------
 
     /**
@@ -209,6 +250,7 @@ public class LeaveBalanceService {
 
         LeaveBalance b = ensureBalance(employee, type, leaveYear);
         b.setEntitled(entitled.setScale(DAY_SCALE, RoundingMode.HALF_UP));
+        b.setEntitlementOverridden(true);   // never auto-re-prorated from here on
         return LeaveBalanceResponse.from(b, startMonth, LocalDate.now());
     }
 

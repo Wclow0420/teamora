@@ -12,6 +12,8 @@ type Props = {
   hasPhoto?: boolean;
   /** Fallback avatar initial when there's no photo (or it fails to load). */
   initial: string;
+  /** Whose photo this is — names the tap target for screen readers. */
+  name?: string;
   /** Fallback avatar tint. */
   tint: { bg: string; fg: string };
   size?: number;
@@ -26,7 +28,7 @@ type Props = {
  * {@link Avatar} when there's no photo, no session token, or the image fails to
  * load — so the row is always resilient.
  */
-export function SelfieThumb({ recordId, hasPhoto, initial, tint, size = 38, onPress, style }: Props) {
+export function SelfieThumb({ recordId, hasPhoto, initial, name, tint, size = 38, onPress, style }: Props) {
   const avatar = <Avatar initial={initial} size={size} tint={tint} />;
 
   if (!hasPhoto || !recordId) {
@@ -35,7 +37,13 @@ export function SelfieThumb({ recordId, hasPhoto, initial, tint, size = 38, onPr
 
   const corner = Math.round(size * 0.34);
   return (
-    <Pressable onPress={onPress} disabled={!onPress} style={style}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole="imagebutton"
+      accessibilityLabel={name ? `View ${name}'s clock-in photo` : 'View clock-in photo'}
+      style={style}
+    >
       <AuthedImage
         uri={attendanceApi.photoUrl(recordId)}
         fallback={avatar}

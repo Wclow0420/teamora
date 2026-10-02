@@ -16,7 +16,9 @@ public record LiveStaffRow(
         /** Today's attendance record id (null if the employee hasn't clocked in). */
         java.util.UUID attendanceRecordId,
         /** True when that record has a stored clock-in selfie — the app builds the photo URL. */
-        boolean hasPhoto
+        boolean hasPhoto,
+        /** The real site the person clocked in at today; null when they have no assigned site / haven't clocked in. */
+        String location
 ) {
     public static LiveStaffRow from(Employee e, AttendanceRecord r) {
         AttendanceStatus status = r != null ? r.getStatus() : AttendanceStatus.ABSENT;
@@ -32,7 +34,8 @@ public record LiveStaffRow(
                 time,
                 accentKey(status),
                 r != null ? r.getId() : null,
-                hasPhoto
+                hasPhoto,
+                r != null ? r.getLocation() : null
         );
     }
 

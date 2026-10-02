@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi } from '@/api/endpoints';
-import { setUnauthorizedHandler } from '@/api/client';
+import { ApiError, setUnauthorizedHandler } from '@/api/client';
+import { queryClient } from '@/api/queryClient';
 import { clearTokens, getRefreshToken, loadTokens, saveTokens } from '@/api/tokenStore';
 import { registerPushToken, unregisterPushToken } from '@/notifications/push';
 import type { EmployeeResponse, Role } from '@/api/types';
@@ -16,7 +17,11 @@ import type { EmployeeResponse, Role } from '@/api/types';
  * there is no client-side "secret" gate.
  */
 
-type Status = 'loading' | 'authenticated' | 'unauthenticated';
+/**
+ * `offline` = we hold tokens but couldn't reach the server to confirm them
+ * (no signal / server down). The session is kept; the entry gate offers Retry.
+ */
+type Status = 'loading' | 'authenticated' | 'unauthenticated' | 'offline';
 
 type AuthState = {
   status: Status;
@@ -25,6 +30,8 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<EmployeeResponse>;
   signUp: (companyName: string, fullName: string, email: string, password: string) => Promise<EmployeeResponse>;
   signOut: () => Promise<void>;
+  /** Re-attempt the session restore after an `offline` launch. */
+  retryRestore: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -44,34 +51,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     await clearTokens();
+    // Drop every cached response so the next account never sees this one's data.
+    queryClient.clear();
     setEmployee(null);
     setStatus('unauthenticated');
   }, []);
 
-  // Restore a persisted session on launch.
+  /**
+   * Restore a persisted session. Only a definite rejection (401/403) ends the
+   * session — a network failure or server error keeps the tokens and reports
+   * `offline`, so a patchy connection never logs anyone out.
+   */
+  const restore = useCallback(async (isActive: () => boolean = () => true) => {
+    const tokens = await loadTokens();
+    if (!tokens) {
+      if (isActive()) setStatus('unauthenticated');
+      return;
+    }
+    try {
+      const me = await authApi.me();
+      if (!isActive()) return;
+      setEmployee(me);
+      setStatus('authenticated');
+      void registerPushToken();
+    } catch (e) {
+      const rejected = e instanceof ApiError && (e.status === 401 || e.status === 403);
+      if (rejected) {
+        await clearTokens();
+        queryClient.clear();
+        if (isActive()) setStatus('unauthenticated');
+      } else if (isActive()) {
+        setStatus('offline');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
-    (async () => {
-      const tokens = await loadTokens();
-      if (!tokens) {
-        if (active) setStatus('unauthenticated');
-        return;
-      }
-      try {
-        const me = await authApi.me();
-        if (!active) return;
-        setEmployee(me);
-        setStatus('authenticated');
-        void registerPushToken();
-      } catch {
-        await clearTokens();
-        if (active) setStatus('unauthenticated');
-      }
-    })();
+    void restore(() => active);
     return () => {
       active = false;
     };
-  }, []);
+  }, [restore]);
+
+  const retryRestore = useCallback(async () => {
+    setStatus('loading');
+    await restore();
+  }, [restore]);
 
   // A failed refresh (inside the API client) forces a sign-out.
   useEffect(() => {
@@ -83,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email.trim(), password);
+    queryClient.clear(); // never inherit a previous account's cache
     await saveTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
     setEmployee(res.employee);
     setStatus('authenticated');
@@ -92,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = useCallback(async (companyName: string, fullName: string, email: string, password: string) => {
     const res = await authApi.register({ companyName, fullName, email: email.trim(), password });
+    queryClient.clear(); // never inherit a previous account's cache
     await saveTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
     setEmployee(res.employee);
     setStatus('authenticated');
@@ -107,8 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      retryRestore,
     }),
-    [status, employee, signIn, signUp, signOut],
+    [status, employee, signIn, signUp, signOut, retryRestore],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

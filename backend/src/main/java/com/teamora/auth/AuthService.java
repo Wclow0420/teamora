@@ -55,7 +55,6 @@ public class AuthService {
                 .fullName(req.fullName())
                 .role(Role.OWNER)
                 .jobTitle("Owner")
-                .location(company.getName())
                 .active(true)
                 .build();
         owner.setCompany(company);

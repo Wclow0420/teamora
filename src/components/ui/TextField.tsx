@@ -14,6 +14,8 @@ type Props = {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   multiline?: boolean;
   error?: string | null;
+  /** Quiet guidance under the field (e.g. a password rule). Replaced by `error` when there is one. */
+  helper?: string;
 };
 
 /** Labelled text input matching the Warm & Human form style. */
@@ -28,6 +30,7 @@ export function TextField({
   autoCapitalize = 'sentences',
   multiline = false,
   error,
+  helper,
 }: Props) {
   return (
     <View>
@@ -50,6 +53,7 @@ export function TextField({
         <TextInput
           value={value}
           onChangeText={onChangeText}
+          accessibilityLabel={label}
           placeholder={placeholder}
           placeholderTextColor={palette.faint}
           secureTextEntry={secure}
@@ -60,7 +64,11 @@ export function TextField({
           style={[font(500), { flex: 1, fontSize: 14, color: palette.ink, paddingTop: multiline ? 0 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]}
         />
       </View>
-      {error && <Text style={[font(600), { fontSize: 11.5, color: palette.danger, marginTop: 6 }]}>{error}</Text>}
+      {error ? (
+        <Text style={[font(600), { fontSize: 11.5, lineHeight: 16, color: palette.danger, marginTop: 6 }]}>{error}</Text>
+      ) : helper ? (
+        <Text style={[font(500), { fontSize: 11.5, lineHeight: 16, color: palette.faint, marginTop: 6 }]}>{helper}</Text>
+      ) : null}
     </View>
   );
 }

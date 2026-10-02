@@ -32,6 +32,30 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, UUID
                                                @Param("from") java.time.LocalDate from,
                                                @Param("to") java.time.LocalDate to);
 
+    /** An employee's requests in any of {@code statuses} whose date range touches [from, to]. */
+    @Query("""
+            select r from LeaveRequest r
+            where r.employee.id = :employeeId
+              and r.status in :statuses
+              and r.startDate <= :to
+              and r.endDate >= :from
+            """)
+    List<LeaveRequest> findOverlapping(@Param("employeeId") UUID employeeId,
+                                       @Param("statuses") java.util.Collection<LeaveStatus> statuses,
+                                       @Param("from") java.time.LocalDate from,
+                                       @Param("to") java.time.LocalDate to);
+
+    /** An employee's requests of one leave type in one status (e.g. everything still PENDING). */
+    @Query("""
+            select r from LeaveRequest r
+            where r.employee.id = :employeeId
+              and r.leaveType.id = :leaveTypeId
+              and r.status = :status
+            """)
+    List<LeaveRequest> findByEmployeeAndTypeAndStatus(@Param("employeeId") UUID employeeId,
+                                                      @Param("leaveTypeId") UUID leaveTypeId,
+                                                      @Param("status") LeaveStatus status);
+
     // All pending in the company (HR_ADMIN / OWNER override view).
     @Query("""
             select r from LeaveRequest r

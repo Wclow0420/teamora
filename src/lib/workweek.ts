@@ -79,3 +79,11 @@ export function deriveRates(
   const hourly = hoursPerDay > 0 ? daily / hoursPerDay : null;
   return { scheduledDays, daily, hourly };
 }
+
+/** Shown when every weekday is switched off — a schedule needs at least one working day. */
+export const NO_WORKING_DAYS_ERROR = 'Pick at least one working day.';
+
+/** True when the mask has no working day selected (the server rejects this). */
+export function isEmptyMask(mask: number): boolean {
+  return (mask & FULL_WEEK_MASK) === 0;
+}

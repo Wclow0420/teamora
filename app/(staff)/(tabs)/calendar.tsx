@@ -6,6 +6,7 @@ import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { Card, Icon, IconTile, type IconName } from '@/components/ui';
 import { useCalendar } from '@/api/queries';
 import { accentFromKey } from '@/api/accents';
+import { periodLabel } from '@/lib/period';
 import { palette, font, radius, gradients } from '@/theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -39,13 +40,13 @@ export default function Calendar() {
       {/* month card */}
       <Card padding={0} style={{ paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12, borderRadius: 22 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 12 }}>
-          <Pressable onPress={() => shift(-1)} hitSlop={10}>
+          <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Previous month">
             <Icon name="chevL" size={18} color={palette.faint} />
           </Pressable>
           <Text style={[font(700), { fontSize: 14, color: palette.ink }]}>
-            {q.data?.monthLabel ?? `${ym.year}-${ym.month + 1}`}
+            {q.data?.monthLabel ?? periodLabel(monthParam)}
           </Text>
-          <Pressable onPress={() => shift(1)} hitSlop={10}>
+          <Pressable onPress={() => shift(1)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Next month">
             <Icon name="chevR" size={18} color={palette.faint} />
           </Pressable>
         </View>

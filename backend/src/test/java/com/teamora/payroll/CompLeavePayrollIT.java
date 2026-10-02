@@ -49,6 +49,22 @@ class CompLeavePayrollIT extends AbstractIntegrationTest {
         assertThat(lineBasic(run, "Uma Unpaid")).isEqualTo("3,600.00");
         assertThat(lineBasic(run, "Vina Paid")).isEqualTo("4,000.00");
 
+        // The admin run line exposes the unpaid-leave deduction (null when there is none).
+        JsonNode umaLine = line(run, "Uma Unpaid");
+        assertThat(umaLine.get("unpaidDays").decimalValue()).isEqualByComparingTo("2");
+        assertThat(umaLine.get("unpaidDaysLabel").asText()).isEqualTo("2 days");
+        assertThat(umaLine.get("unpaidDeductionLabel").asText()).isEqualTo("400.00");
+        JsonNode vinaLine = line(run, "Vina Paid");
+        assertThat(vinaLine.get("unpaidDays").decimalValue()).isEqualByComparingTo("0");
+        assertThat(vinaLine.get("unpaidDaysLabel").asText()).isEqualTo("None");
+        assertThat(vinaLine.get("unpaidDeductionLabel").isNull()).isTrue();
+
+        // A DRAFT run is not final — staff can't see their payslip until it is approved.
+        mvc.perform(get("/api/payroll/payslips/" + PERIOD).header("Authorization", bearer(uma)))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/admin/payroll/run/" + PERIOD + "/approve").header("Authorization", bearer(owner)))
+                .andExpect(status().isOk());
+
         // The payslip carries the transparency figures for Uma.
         JsonNode umaSlip = payslip(uma);
         assertThat(umaSlip.get("unpaidDays").asInt()).isEqualTo(2);
@@ -95,10 +111,14 @@ class CompLeavePayrollIT extends AbstractIntegrationTest {
     }
 
     private String lineBasic(MvcResult run, String employeeName) throws Exception {
+        return line(run, employeeName).get("basicLabel").asText();
+    }
+
+    private JsonNode line(MvcResult run, String employeeName) throws Exception {
         JsonNode lines = om.readTree(run.getResponse().getContentAsString()).get("lines");
         for (JsonNode line : lines) {
             if (employeeName.equals(line.get("employeeName").asText())) {
-                return line.get("basicLabel").asText();
+                return line;
             }
         }
         throw new AssertionError("No payslip line for " + employeeName);

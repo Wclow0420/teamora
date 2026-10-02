@@ -58,6 +58,14 @@ public class LeaveBalance extends TenantEntity {
     @Column(nullable = false, precision = 6, scale = 2)
     private BigDecimal used;
 
+    /**
+     * True once an admin has set {@link #entitled} by hand (seniority, negotiated
+     * package, correction). An overridden row is never re-prorated automatically.
+     */
+    @Builder.Default
+    @Column(name = "entitlement_overridden", nullable = false)
+    private boolean entitlementOverridden = false;
+
     /** Entitled days, never null, at 2dp. */
     public BigDecimal entitledOrZero() {
         return scaled(entitled);

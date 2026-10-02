@@ -19,6 +19,9 @@ export function DecideRow({ pending, onApprove, onReject }: DecideProps) {
       <Pressable
         disabled={pending}
         onPress={onReject}
+        accessibilityRole="button"
+        accessibilityLabel="Decline"
+        accessibilityState={{ disabled: pending }}
         style={{ flex: 1, height: 44, borderRadius: 13, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, opacity: pending ? 0.5 : 1 }}
       >
         <Icon name="x" size={17} color={palette.danger} stroke={2.2} />
@@ -150,6 +153,9 @@ export function ApprovalTabs<T extends string>({
           <Pressable
             key={t.key}
             onPress={() => onChange(t.key)}
+            accessibilityRole="tab"
+            accessibilityLabel={`${t.label}, ${t.count} pending`}
+            accessibilityState={{ selected: on }}
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10, borderRadius: 13, backgroundColor: on ? palette.ink : palette.surface, borderWidth: on ? 0 : 1, borderColor: palette.line }}
           >
             <Text style={[font(700), { fontSize: 13, color: on ? palette.white : palette.soft }]}>{t.label}</Text>

@@ -120,7 +120,6 @@ public class AttendanceSeeder implements CommandLineRunner {
 
     private AttendanceRecord building(Employee e, LocalDate date, AttendanceStatus status,
                                       Instant clockIn, Instant clockOut, Integer workedMinutes) {
-        String location = status == AttendanceStatus.REMOTE ? "Remote" : "Bangsar South HQ";
         AttendanceRecord record = AttendanceRecord.builder()
                 .employee(e)
                 .workDate(date)
@@ -128,7 +127,8 @@ public class AttendanceSeeder implements CommandLineRunner {
                 .clockOutAt(clockOut)
                 .status(status)
                 .workedMinutes(workedMinutes)
-                .location(location)
+                // No work locations are seeded, so there is no real site to record.
+                .location(null)
                 .build();
         record.setCompany(e.getCompany());
         return record;

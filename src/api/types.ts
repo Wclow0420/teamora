@@ -41,8 +41,14 @@ export type CompanySettings = {
   defaultHoursPerDay: number;
   /** Month (1–12) the company's leave year begins. 1 = calendar year. */
   leaveYearStartMonth: number;
+  /** Start of the work day, "HH:mm" (24h). Optional: an older backend doesn't send it. */
+  workStartTime?: string | null;
+  /** Minutes after `workStartTime` before a clock-in counts as late (0–120). */
+  lateGraceMinutes?: number | null;
 };
 export type UpdateCompanySettingsBody = {
+  workStartTime?: string;
+  lateGraceMinutes?: number;
   defaultPayBasis?: PayBasis;
   defaultWorkingDays?: number;
   defaultHoursPerDay?: number;
@@ -207,16 +213,20 @@ export type TodayStatus = {
   clockInAt: string | null;
   workedMinutes: number | null;
   shift: string;
-  location: string;
+  /** The assigned work site's name; null when the employee has no site. */
+  location: string | null;
 };
 export type LiveStaffRow = {
   employeeId: string;
   name: string;
   initial: string;
-  department: string;
+  department: string | null;
+  /** AttendanceStatus: WORKING | PRESENT | LATE | REMOTE | ON_LEAVE | ABSENT. */
   status: string;
   time: string;
   accentColorKey: string;
+  /** Real work-site name for today's clock-in; null/absent when there is none. */
+  location?: string | null;
   /** Today's attendance record id — used to build the clock-in photo URL. */
   attendanceRecordId?: string | null;
   /** Whether a clock-in selfie is stored for today's record. */
@@ -403,7 +413,8 @@ export type Payslip = {
   payDateLabel: string;
   status: string;
   statusLabel: string;
-  bankLabel: string;
+  /** "Maybank ••1234", bank name only, or null when HR has no bank details on file. */
+  bankLabel: string | null;
   /**
    * Unpaid-leave transparency (present once the comp/leave engine ships). `basic`
    * is the paid basic (already net of any unpaid deduction); these fields explain
@@ -448,9 +459,13 @@ export type PayrollRunLine = {
   deductionsLabel: string;
   netLabel: string;
   status: PayslipStatus;
-  /** Unpaid-leave transparency (present once the comp/leave engine ships). */
-  unpaidDaysLabel?: string;
-  unpaidDeductionLabel?: string;
+  /**
+   * Unpaid-leave transparency. `unpaidDeductionLabel` is null when nothing was
+   * deducted; all three are optional so an older backend still parses.
+   */
+  unpaidDays?: number;
+  unpaidDaysLabel?: string | null;
+  unpaidDeductionLabel?: string | null;
 };
 
 export type PayrollRun = {

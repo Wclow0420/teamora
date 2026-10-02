@@ -58,7 +58,8 @@ export default function ClockIn() {
 
   // An assigned site → geofenced clock-in (we must send coords).
   const assignedSite = me.data?.workLocationName ?? null;
-  const workLocation = assignedSite ?? me.data?.location ?? me.data?.companyName ?? 'Your workplace';
+  // Only a real assigned site is ever named — otherwise fall back to the company itself.
+  const workLocation = assignedSite ?? me.data?.companyName ?? 'Your workplace';
   const locationSubtitle = assignedSite ? 'Verify you are on-site to clock in' : 'Your work location';
 
   const busy = clockIn.isPending || locating || capturing;
@@ -126,6 +127,8 @@ export default function ClockIn() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Pressable
             onPress={() => (router.canGoBack() ? router.back() : null)}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
             style={{
               width: 40,
               height: 40,

@@ -86,7 +86,10 @@ public record EmployeeResponse(
                 : null;
         return new EmployeeResponse(
                 e.getId(), e.getEmail(), e.getFullName(), e.getInitial(), e.getRole(),
-                e.getJobTitle(), e.getDepartment(), e.getLocation(), e.getStaffId(),
+                // `location` is the REAL assigned work site only (same as workLocationName) —
+                // never the legacy free-text employees.location column, which used to be
+                // back-filled with the company name/address and read as a fake site.
+                e.getJobTitle(), e.getDepartment(), wl != null ? wl.getName() : null, e.getStaffId(),
                 e.getPhone(), e.getJoinDate(), e.isActive(),
                 e.getCompany() != null ? e.getCompany().getId() : null,
                 e.getCompany() != null ? e.getCompany().getName() : null,

@@ -132,6 +132,7 @@ export default function CalendarEvents() {
                     <Pressable
                       key={e.id}
                       onPress={() => openEdit(e)}
+                      accessibilityRole="button"
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',

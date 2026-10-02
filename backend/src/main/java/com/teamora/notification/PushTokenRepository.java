@@ -10,4 +10,5 @@ public interface PushTokenRepository extends JpaRepository<PushToken, UUID> {
     Optional<PushToken> findByToken(String token);
     List<PushToken> findByEmployeeId(UUID employeeId);
     void deleteByToken(String token);
+    void deleteByEmployeeId(UUID employeeId);
 }

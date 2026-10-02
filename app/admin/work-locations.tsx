@@ -51,6 +51,7 @@ export default function WorkLocations() {
                   <Pressable
                     key={w.id}
                     onPress={() => openEdit(w)}
+                    accessibilityRole="button"
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',

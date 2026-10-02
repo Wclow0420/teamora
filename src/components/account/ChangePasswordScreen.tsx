@@ -5,11 +5,8 @@ import { Screen } from '@/components/layout/Screen';
 import { Button, Icon, ScreenHeader, TextField } from '@/components/ui';
 import { useChangePassword } from '@/api/queries';
 import { ApiError } from '@/api/client';
+import { PASSWORD_HELPER, passwordError } from '@/lib/password';
 import { palette, font, spacing } from '@/theme';
-
-/** Server rule (mirrored client-side so the user hears about it before a round-trip). */
-export const MIN_PASSWORD_LENGTH = 8;
-export const MAX_PASSWORD_LENGTH = 72;
 
 /**
  * Change-my-password screen, shared by the staff and admin stacks (each has a
@@ -42,11 +39,9 @@ export function ChangePasswordScreen() {
       setCurrentError('Enter your current password.');
       valid = false;
     }
-    if (next.length < MIN_PASSWORD_LENGTH) {
-      setNextError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
-      valid = false;
-    } else if (next.length > MAX_PASSWORD_LENGTH) {
-      setNextError(`Keep it to ${MAX_PASSWORD_LENGTH} characters or fewer.`);
+    const rule = passwordError(next);
+    if (rule) {
+      setNextError(rule);
       valid = false;
     } else if (next === current) {
       setNextError('Choose a password different from your current one.');
@@ -60,7 +55,7 @@ export function ChangePasswordScreen() {
 
     try {
       await change.mutateAsync({ currentPassword: current, newPassword: next });
-      Alert.alert('Password changed', "Use your new password the next time you sign in. You've been signed out on your other devices.");
+      Alert.alert('Password changed', "Use your new password the next time you sign in. Your other devices will be signed out shortly.");
       if (router.canGoBack()) router.back();
     } catch (e) {
       if (e instanceof ApiError) {
@@ -95,7 +90,7 @@ export function ChangePasswordScreen() {
           onChangeText={setNext}
           secure={!show}
           autoCapitalize="none"
-          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+          helper={PASSWORD_HELPER}
           error={nextError}
         />
         <TextField
@@ -111,6 +106,7 @@ export function ChangePasswordScreen() {
         <Pressable
           onPress={() => setShow((s) => !s)}
           accessibilityRole="checkbox"
+          accessibilityLabel="Show passwords"
           accessibilityState={{ checked: show }}
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start' }}

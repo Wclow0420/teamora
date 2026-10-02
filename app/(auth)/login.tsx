@@ -44,6 +44,7 @@ function Field({
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        accessibilityLabel={placeholder}
         placeholder={placeholder}
         placeholderTextColor={palette.faint}
         secureTextEntry={secure}
@@ -92,7 +93,7 @@ export default function Login() {
           <LinearGradient colors={gradients.avatar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 34, height: 34, borderRadius: 10 }} />
           <Text style={[font(800), { fontSize: 20, color: palette.ink, letterSpacing: -0.5 }]}>Teamora</Text>
         </View>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
           <Text style={[font(600), { fontSize: 13, color: palette.faint }]}>Back</Text>
         </Pressable>
       </View>
@@ -128,7 +129,7 @@ export default function Login() {
         <Button label={submitting ? 'Signing in…' : 'Sign in'} icon="arrowR" iconTrailing height={54} disabled={submitting} onPress={onSubmit} />
       </View>
 
-      <Pressable onPress={() => router.push('/register')} style={{ marginTop: 18, alignItems: 'center' }}>
+      <Pressable onPress={() => router.push('/register')} accessibilityRole="button" style={{ marginTop: 18, alignItems: 'center' }}>
         <Text style={[font(600), { fontSize: 13, color: palette.soft }]}>
           New company? <Text style={[font(700), { color: palette.coral }]}>Create an account</Text>
         </Text>

@@ -9,7 +9,7 @@ import { useEmployee, useUpdateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
 import type { PayBasis } from '@/api/types';
 import { parseHours, parseSalary } from '@/lib/employeeFields';
-import { WEEKDAYS_MASK } from '@/lib/workweek';
+import { NO_WORKING_DAYS_ERROR, WEEKDAYS_MASK, isEmptyMask } from '@/lib/workweek';
 import { palette, font, spacing } from '@/theme';
 
 /**
@@ -48,6 +48,10 @@ export default function EmployeeCompensation() {
     const monthlySalary = parseSalary(salary);
     if (salary.trim() && monthlySalary === undefined) {
       setError('Enter a valid monthly salary, or leave it blank.');
+      return;
+    }
+    if (isEmptyMask(workingDays)) {
+      setError(NO_WORKING_DAYS_ERROR);
       return;
     }
     const hours = parseHours(hoursPerDay);
@@ -96,7 +100,7 @@ export default function EmployeeCompensation() {
             <Button
               label={update.isPending ? 'Saving…' : 'Save compensation'}
               icon="check"
-              disabled={update.isPending}
+              disabled={update.isPending || isEmptyMask(workingDays)}
               onPress={onSave}
             />
           </View>

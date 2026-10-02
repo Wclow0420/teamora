@@ -37,6 +37,8 @@ type Props = {
   /** Right-side node (avatar / badge / chip). Scales down when collapsing. */
   accessory?: ReactNode;
   onAccessoryPress?: () => void;
+  /** Screen-reader name for the tappable accessory (required for icon/avatar-only ones). */
+  accessoryLabel?: string;
   /** Show a back button that pops the stack. */
   back?: boolean;
   /** Larger title weight/size (matches ScreenHeader `large`). */
@@ -64,6 +66,7 @@ export function CollapsingHeaderScreen({
   eyebrow,
   accessory,
   onAccessoryPress,
+  accessoryLabel,
   back = false,
   large = false,
   titleSize,
@@ -87,6 +90,8 @@ export function CollapsingHeaderScreen({
   const BackButton = back ? (
     <Pressable
       onPress={() => (router.canGoBack() ? router.back() : null)}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
       style={{
         width: 40,
         height: 40,
@@ -104,7 +109,7 @@ export function CollapsingHeaderScreen({
 
   const Accessory = accessory ? (
     onAccessoryPress ? (
-      <Pressable onPress={onAccessoryPress} hitSlop={8}>
+      <Pressable onPress={onAccessoryPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={accessoryLabel}>
         {accessory}
       </Pressable>
     ) : (

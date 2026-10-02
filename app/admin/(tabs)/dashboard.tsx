@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
 import { Avatar, BarChart, Card, Chip, Icon, IconTile, SectionLabel } from '@/components/ui';
 import type { IconName } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useDashboard, useMe } from '@/api/queries';
 import { accentFromKey } from '@/api/accents';
 import type { DashboardSummary, Role } from '@/api/types';
@@ -71,8 +72,19 @@ export default function Dashboard() {
       bottomInset={70}
       title={`${greeting(now)}, ${firstName}`}
       subtitle={subtitle}
-      accessory={<Avatar initial={me.data?.initial ?? '·'} colors={gradients.violet} size={44} />}
-      onAccessoryPress={() => router.push('/admin/profile')}
+      accessory={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <NotificationBell onPress={() => router.push('/admin/notifications')} />
+          <Pressable
+            onPress={() => router.push('/admin/profile')}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+          >
+            <Avatar initial={me.data?.initial ?? '·'} colors={gradients.violet} size={44} />
+          </Pressable>
+        </View>
+      }
     >
       <AsyncBoundary loading={dash.isLoading} error={dash.error} onRetry={dash.refetch}>
         {d && (
@@ -105,7 +117,6 @@ export default function Dashboard() {
                 max={Math.max(d.week.max, 1)}
                 labels={d.week.labels}
                 highlight={[todayIdx]}
-                barColor="#EAD2BE"
               />
             </Card>
 

@@ -9,6 +9,8 @@ import com.teamora.common.GeoUtil;
 import com.teamora.common.PhotoCodec;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
+import com.teamora.company.CompanySettings;
+import com.teamora.company.CompanySettingsService;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
 import com.teamora.location.WorkLocation;
@@ -37,11 +39,10 @@ import java.util.UUID;
 public class AttendanceService {
 
     private static final ZoneId KL = ZoneId.of("Asia/Kuala_Lumpur");
-    private static final LocalTime LATE_AFTER = LocalTime.of(9, 5);
-    private static final String DEFAULT_LOCATION = "Bangsar South HQ";
 
     private final AttendanceRepository attendance;
     private final EmployeeRepository employees;
+    private final CompanySettingsService companySettings;
 
     private LocalDate today() {
         return LocalDate.now(KL);
@@ -75,7 +76,7 @@ public class AttendanceService {
 
         Instant now = Instant.now();
         LocalTime localNow = now.atZone(KL).toLocalTime();
-        AttendanceStatus status = localNow.isAfter(LATE_AFTER)
+        AttendanceStatus status = isLate(localNow, companySettings.resolve(current.getCompany()))
                 ? AttendanceStatus.LATE
                 : AttendanceStatus.PRESENT;
 
@@ -88,7 +89,8 @@ public class AttendanceService {
         }
         record.setClockInAt(now);
         record.setStatus(status);
-        record.setLocation(site != null ? site.getName() : DEFAULT_LOCATION);
+        // Only a real assigned site is recorded — no site means no location (never a made-up default).
+        record.setLocation(site != null ? site.getName() : null);
         record.setClockInLat(latitude);
         record.setClockInLng(longitude);
 
@@ -99,7 +101,21 @@ public class AttendanceService {
             record.setClockInPhotoType(photo.contentType());
         }
 
-        return TodayStatusResponse.from(attendance.save(record));
+        return todayResponse(attendance.save(record), current);
+    }
+
+    /**
+     * Late = clocked in after the company's work start time plus its grace period
+     * (default 09:00 + 5 min). Compared in seconds-of-day so a late-evening start
+     * with a long grace can't wrap past midnight.
+     */
+    static boolean isLate(LocalTime clockIn, CompanySettings settings) {
+        return isLate(clockIn, settings.workStartTimeOrDefault(), settings.getLateGraceMinutes());
+    }
+
+    static boolean isLate(LocalTime clockIn, LocalTime workStart, int graceMinutes) {
+        long lateAfter = workStart.toSecondOfDay() + Math.max(0, graceMinutes) * 60L;
+        return clockIn.toSecondOfDay() > lateAfter;
     }
 
     /** The employee's assigned work location, only if it exists and is active. */
@@ -146,14 +162,19 @@ public class AttendanceService {
         record.setClockOutAt(now);
         record.setWorkedMinutes((int) Duration.between(record.getClockInAt(), now).toMinutes());
 
-        return TodayStatusResponse.from(attendance.save(record));
+        return todayResponse(attendance.save(record), current);
     }
 
     // ---------- Reads ----------
 
     public TodayStatusResponse today(Employee current) {
-        return TodayStatusResponse.from(
-                attendance.findByEmployeeIdAndWorkDate(current.getId(), today()).orElse(null));
+        return todayResponse(
+                attendance.findByEmployeeIdAndWorkDate(current.getId(), today()).orElse(null), current);
+    }
+
+    private TodayStatusResponse todayResponse(AttendanceRecord record, Employee current) {
+        return TodayStatusResponse.from(record,
+                companySettings.resolve(current.getCompany()).workStartTimeOrDefault());
     }
 
     /**

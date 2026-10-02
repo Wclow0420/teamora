@@ -7,7 +7,10 @@ import {
   Button,
   TextField,
   SelectChips,
+  TimeField,
   WeekdayToggles,
+  fromHHMM,
+  toHHMM,
   SectionLabel,
   Card,
   Chip,
@@ -26,7 +29,7 @@ import {
 import { accentFromKey } from '@/api/accents';
 import { ApiError } from '@/api/client';
 import type { CompanyResponse, CompanySettings, LeaveTypeDef, PayBasis } from '@/api/types';
-import { describeMask } from '@/lib/workweek';
+import { NO_WORKING_DAYS_ERROR, describeMask, isEmptyMask } from '@/lib/workweek';
 import { palette, font, radius, tint } from '@/theme';
 
 const PAY_BASIS_OPTIONS: SelectOption<PayBasis>[] = [
@@ -42,6 +45,9 @@ const LEAVE_YEAR_MONTH_OPTIONS: SelectOption<string>[] = MONTH_LABELS.map((label
   value: String(i + 1),
   label,
 }));
+
+/** Server limit for the late-arrival grace period. */
+const MAX_LATE_GRACE_MINUTES = 120;
 
 /** Coerce a stored month to 1–12, defaulting to January. */
 function safeMonth(value: number | undefined): number {
@@ -100,11 +106,18 @@ function CompanyForm({ company }: { company: CompanyResponse }) {
   const [phone, setPhone] = useState(company.phone ?? '');
   const [address, setAddress] = useState(company.address ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const onSubmit = async () => {
+    if (update.isPending) return;
     setError(null);
+    setNameError(null);
+    if (!name.trim()) {
+      setNameError('Enter your company name.');
+      return;
+    }
     try {
-      await update.mutateAsync({ name, registrationNo, epfNo, socsoNo, email, phone, address });
+      await update.mutateAsync({ name: name.trim(), registrationNo, epfNo, socsoNo, email, phone, address });
       router.back();
     } catch (e) {
       if (e instanceof ApiError) setError(e.message);
@@ -114,7 +127,16 @@ function CompanyForm({ company }: { company: CompanyResponse }) {
 
   return (
     <View style={{ gap: 14, marginTop: 8 }}>
-      <TextField label="Company name" value={name} onChangeText={setName} />
+      <TextField
+        label="Company name"
+        value={name}
+        onChangeText={(t) => {
+          setName(t);
+          if (nameError && t.trim()) setNameError(null);
+        }}
+        autoCapitalize="words"
+        error={nameError}
+      />
       <TextField label="Registration no. (SSM)" value={registrationNo} onChangeText={setRegistrationNo} />
       <TextField label="Employer EPF no." value={epfNo} onChangeText={setEpfNo} />
       <TextField label="Employer SOCSO no." value={socsoNo} onChangeText={setSocsoNo} />
@@ -142,12 +164,27 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
   const [workingDays, setWorkingDays] = useState<number>(settings.defaultWorkingDays);
   const [hoursPerDay, setHoursPerDay] = useState(String(settings.defaultHoursPerDay));
   const [leaveYearStartMonth, setLeaveYearStartMonth] = useState(String(safeMonth(settings.leaveYearStartMonth)));
+  // Attendance rules — only offered when the server sends them (an older API doesn't).
+  const hasAttendanceRules = settings.workStartTime != null && settings.lateGraceMinutes != null;
+  const [workStart, setWorkStart] = useState<Date | null>(fromHHMM(settings.workStartTime));
+  const [lateGrace, setLateGrace] = useState(String(settings.lateGraceMinutes ?? ''));
+  const [graceError, setGraceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  const noWorkingDays = isEmptyMask(workingDays);
+
   const onSave = async () => {
+    if (update.isPending) return;
     setError(null);
+    setGraceError(null);
     setSaved(false);
+    if (noWorkingDays) return; // the inline error under the toggles already says why
+    const grace = Number(lateGrace.trim());
+    if (hasAttendanceRules && (!lateGrace.trim() || !Number.isInteger(grace) || grace < 0 || grace > MAX_LATE_GRACE_MINUTES)) {
+      setGraceError(`Enter whole minutes from 0 to ${MAX_LATE_GRACE_MINUTES}.`);
+      return;
+    }
     const hours = Number(hoursPerDay);
     if (!Number.isFinite(hours) || hours <= 0) {
       setError('Enter valid hours per day.');
@@ -159,6 +196,9 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
         defaultWorkingDays: workingDays,
         defaultHoursPerDay: hours,
         leaveYearStartMonth: Number(leaveYearStartMonth),
+        ...(hasAttendanceRules && workStart
+          ? { workStartTime: toHHMM(workStart), lateGraceMinutes: grace }
+          : {}),
       });
       setSaved(true);
     } catch (e) {
@@ -169,8 +209,15 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
   return (
     <View style={{ gap: 14 }}>
       <SelectChips label="Default pay basis" options={PAY_BASIS_OPTIONS} value={payBasis} onChange={setPayBasis} />
-      <WeekdayToggles label="Default working days" value={workingDays} onChange={setWorkingDays} />
-      <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8 }]}>{describeMask(workingDays)}</Text>
+      <WeekdayToggles
+        label="Default working days"
+        value={workingDays}
+        onChange={setWorkingDays}
+        error={noWorkingDays ? NO_WORKING_DAYS_ERROR : null}
+      />
+      {!noWorkingDays && (
+        <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8 }]}>{describeMask(workingDays)}</Text>
+      )}
       <TextField
         label="Default hours per day"
         value={hoursPerDay}
@@ -178,6 +225,20 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
         keyboardType="decimal-pad"
         placeholder="e.g. 8"
       />
+      {hasAttendanceRules && (
+        <>
+          <TimeField label="Work start time" value={workStart} onChange={(d) => d && setWorkStart(d)} clearable={false} />
+          <TextField
+            label="Late after (minutes)"
+            value={lateGrace}
+            onChangeText={setLateGrace}
+            keyboardType="number-pad"
+            placeholder="e.g. 5"
+            error={graceError}
+            helper="A clock-in this many minutes past the start time is marked Late. Use 0 for no grace."
+          />
+        </>
+      )}
       <SelectChips
         label="Leave year starts"
         options={LEAVE_YEAR_MONTH_OPTIONS}
@@ -194,7 +255,7 @@ function PayrollDefaultsForm({ settings }: { settings: CompanySettings }) {
       <Button
         label={update.isPending ? 'Saving…' : 'Save defaults'}
         onPress={onSave}
-        disabled={update.isPending}
+        disabled={update.isPending || noWorkingDays}
       />
     </View>
   );
@@ -229,6 +290,8 @@ function LeaveTypesManager({ types }: { types: LeaveTypeDef[] }) {
               <Pressable
                 key={t.id}
                 onPress={() => openEdit(t)}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${t.name}`}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',

@@ -3,9 +3,9 @@ import { Alert, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { Button, Card, Icon, ScreenHeader, TextField } from '@/components/ui';
-import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/components/account/ChangePasswordScreen';
 import { useResetEmployeePassword } from '@/api/queries';
 import { ApiError } from '@/api/client';
+import { PASSWORD_HELPER, passwordError } from '@/lib/password';
 import { palette, font, radius, spacing, tint } from '@/theme';
 
 /**
@@ -28,14 +28,23 @@ export default function EmployeeResetPassword() {
     if (reset.isPending) return;
     setError(null);
     setFieldError(null);
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setFieldError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
+    const rule = passwordError(password);
+    if (rule) {
+      setFieldError(rule);
       return;
     }
-    if (password.length > MAX_PASSWORD_LENGTH) {
-      setFieldError(`Keep it to ${MAX_PASSWORD_LENGTH} characters or fewer.`);
-      return;
-    }
+    // Replacing someone's password signs them out everywhere — ask first.
+    Alert.alert(
+      `Reset ${name}'s password?`,
+      'Their current password stops working and they will be signed out of their devices.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset password', style: 'destructive', onPress: () => void doReset() },
+      ],
+    );
+  };
+
+  const doReset = async () => {
     try {
       await reset.mutateAsync({ id: params.id, newPassword: password });
       Alert.alert('Password reset', `Share the temporary password with ${name} so they can sign in.`);
@@ -56,7 +65,7 @@ export default function EmployeeResetPassword() {
           value={password}
           onChangeText={setPassword}
           autoCapitalize="none"
-          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+          helper={PASSWORD_HELPER}
           error={fieldError}
         />
 

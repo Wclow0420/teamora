@@ -43,6 +43,12 @@ public record PayrollRunResponse(
             String pcbLabel,
             String deductionsLabel,
             String netLabel,
-            PayslipStatus status
+            PayslipStatus status,
+            /** Unpaid-leave days deducted this period (fractional; 0 when none). */
+            BigDecimal unpaidDays,
+            /** "None" / "1 day" / "2.5 days". */
+            String unpaidDaysLabel,
+            /** Amount deducted for unpaid leave, e.g. "181.82"; null when there is no deduction. */
+            String unpaidDeductionLabel
     ) {}
 }

@@ -78,7 +78,7 @@ export function AttendanceHero({ today, onClockIn, onClockOut, clockingOut = fal
           {onLeave
             ? 'Enjoy your time off. Working part of the day? You can still clock in.'
             : shift
-              ? `Your shift · ${shift}`
+              ? `Work ${shift}`
               : 'Clock in when you start work.'}
         </Text>
         <Button
@@ -97,7 +97,7 @@ export function AttendanceHero({ today, onClockIn, onClockOut, clockingOut = fal
         <HeroTop label="Currently working" live inAt={inAt} />
         <RunningTime since={today.clockInAt as string} />
         <Text style={[font(500), { fontSize: 12.5, color: onDark.text, marginTop: 4 }]}>
-          Worked today{shift ? ` · ${shift}` : ''}
+          Worked today
         </Text>
         <Button
           label={clockingOut ? 'Clocking out…' : 'Clock Out'}
@@ -122,7 +122,7 @@ export function AttendanceHero({ today, onClockIn, onClockOut, clockingOut = fal
           <Text style={[font(800), { fontSize: 24, color: onDark.dim, letterSpacing: -0.5 }]}>m</Text>
         </Text>
         <Text style={[font(500), { fontSize: 12.5, color: onDark.text, marginTop: 4 }]}>
-          Worked today{shift ? ` · ${shift}` : ''}
+          Worked today
         </Text>
       </>
     );

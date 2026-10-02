@@ -10,6 +10,8 @@ type Props = {
   value: Date | null;
   onChange: (d: Date | null) => void;
   placeholder?: string;
+  /** Show the clear (×) action once set. Turn off for a required time. Default true. */
+  clearable?: boolean;
 };
 
 function format(d: Date): string {
@@ -21,7 +23,7 @@ function format(d: Date): string {
 }
 
 /** Optional time picker field. Mirrors `DateField`, with a clear action once set. */
-export function TimeField({ label, value, onChange, placeholder = 'Not set' }: Props) {
+export function TimeField({ label, value, onChange, placeholder = 'Not set', clearable = true }: Props) {
   const [show, setShow] = useState(false);
   const display = value ? format(value) : placeholder;
   return (
@@ -46,7 +48,7 @@ export function TimeField({ label, value, onChange, placeholder = 'Not set' }: P
       >
         <Icon name="clock" size={18} color={palette.faint} />
         <Text style={[font(600), { flex: 1, fontSize: 14, color: value ? palette.ink : palette.faint }]}>{display}</Text>
-        {value ? (
+        {value && clearable ? (
           <Pressable
             onPress={() => {
               setShow(false);
@@ -82,4 +84,16 @@ export function TimeField({ label, value, onChange, placeholder = 'Not set' }: P
 /** Local 24h "HH:mm" for the API. */
 export function toHHMM(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Parse an API "HH:mm" (or "HH:mm:ss") into a Date today at that time; null if it isn't one. */
+export function fromHHMM(value: string | null | undefined): Date | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(value ?? '');
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  const d = new Date();
+  d.setHours(h, min, 0, 0);
+  return d;
 }

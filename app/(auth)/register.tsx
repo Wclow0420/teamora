@@ -5,6 +5,7 @@ import { Screen } from '@/components/layout/Screen';
 import { Button, TextField } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
+import { PASSWORD_HELPER, passwordError } from '@/lib/password';
 import { palette, font } from '@/theme';
 
 export default function Register() {
@@ -16,12 +17,20 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [passwordFieldError, setPasswordFieldError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
+    if (submitting) return;
     setError(null);
+    setPasswordFieldError(null);
     if (!companyName.trim() || !fullName.trim() || !email.trim() || !password) {
       setError('Please fill in all fields.');
+      return;
+    }
+    const rule = passwordError(password);
+    if (rule) {
+      setPasswordFieldError(rule);
       return;
     }
     setSubmitting(true);
@@ -39,7 +48,7 @@ export default function Register() {
     <Screen paddingX={24}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={[font(800), { fontSize: 20, color: palette.ink, letterSpacing: -0.5 }]}>Teamora</Text>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
           <Text style={[font(600), { fontSize: 13, color: palette.faint }]}>Back</Text>
         </Pressable>
       </View>
@@ -62,7 +71,16 @@ export default function Register() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextField label="Password" icon="lock" value={password} onChangeText={setPassword} secure />
+        <TextField
+          label="Password"
+          icon="lock"
+          value={password}
+          onChangeText={setPassword}
+          secure
+          autoCapitalize="none"
+          helper={PASSWORD_HELPER}
+          error={passwordFieldError}
+        />
 
         {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
 

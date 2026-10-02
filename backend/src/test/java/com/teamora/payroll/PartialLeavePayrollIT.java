@@ -69,6 +69,12 @@ class PartialLeavePayrollIT extends AbstractIntegrationTest {
         assertThat(lineBasic(run, "Jaya Paid")).isEqualTo("4,000.00");
         assertThat(lineBasic(run, "Kira Weekend")).isEqualTo("3,600.00");
 
+        // A DRAFT run is not final — staff can't see their payslip until it is approved.
+        mvc.perform(get("/api/payroll/payslips/" + PERIOD).header("Authorization", bearer(hana)))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/admin/payroll/run/" + PERIOD + "/approve").header("Authorization", bearer(owner)))
+                .andExpect(status().isOk());
+
         // Payslip transparency figures carry the fraction, not a rounded whole day.
         JsonNode hanaSlip = payslip(hana);
         assertThat(hanaSlip.get("unpaidDays").decimalValue()).isEqualByComparingTo("0.50");

@@ -21,6 +21,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    // Staff ids are unique within a company (not across tenants).
+    boolean existsByCompanyIdAndStaffIdIgnoreCase(UUID companyId, String staffId);
+
+    boolean existsByCompanyIdAndStaffIdIgnoreCaseAndIdNot(UUID companyId, String staffId, UUID id);
+
     // Tenant-scoped lookups.
     Optional<Employee> findByIdAndCompanyId(UUID id, UUID companyId);
 

@@ -21,7 +21,7 @@ export default function Staff() {
       title="Staff"
       subtitle={q.data ? `${count} ${count === 1 ? 'employee' : 'employees'}` : 'Staff'}
       accessory={
-        <Pressable onPress={() => router.push('/admin/employee-new')} hitSlop={6}>
+        <Pressable onPress={() => router.push('/admin/employee-new')} hitSlop={6} accessibilityRole="button" accessibilityLabel="Add employee">
           <LinearGradient
             colors={gradients.coral}
             start={{ x: 0, y: 0 }}
@@ -51,6 +51,7 @@ export default function Staff() {
         <TextInput
           value={query}
           onChangeText={setQuery}
+          accessibilityLabel="Search staff"
           placeholder="Search name, ID or role"
           placeholderTextColor={palette.faint}
           returnKeyType="search"
@@ -58,7 +59,7 @@ export default function Staff() {
           style={[font(500), { flex: 1, fontSize: 13.5, color: palette.ink, padding: 0 }]}
         />
         {trimmed.length > 0 && (
-          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+          <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
             <Icon name="x" size={16} color={palette.faint} />
           </Pressable>
         )}

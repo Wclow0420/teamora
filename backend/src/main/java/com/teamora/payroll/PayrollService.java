@@ -43,27 +43,39 @@ public class PayrollService {
 
     // ---------------- Staff reads ----------------
 
-    /** All of an employee's payslips, newest first. */
+    /**
+     * A payslip is only shown to its employee once it is final — APPROVED or PAID.
+     * A DRAFT / IN_REVIEW payslip can still change (or be re-run), so staff never see it.
+     */
+    private static boolean visibleToStaff(Payslip p) {
+        return p.getStatus() == PayslipStatus.APPROVED || p.getStatus() == PayslipStatus.PAID;
+    }
+
+    /** All of an employee's finalised payslips, newest first. */
     public List<PayslipResponse> myPayslips(Employee me) {
         return payslips.findByEmployeeIdOrderByPeriodDesc(me.getId()).stream()
-                .map(PayslipResponse::from)
+                .filter(PayrollService::visibleToStaff)
+                .map(p -> PayslipResponse.from(p, me))
                 .toList();
     }
 
-    /** A single payslip for an employee + period. */
+    /** A single finalised payslip for an employee + period (404 while it is still a draft). */
     public PayslipResponse myPayslip(Employee me, String period) {
         Payslip p = payslips.findByEmployeeIdAndPeriod(me.getId(), period)
+                .filter(PayrollService::visibleToStaff)
                 .orElseThrow(() -> ResourceNotFoundException.of("Payslip", period));
-        return PayslipResponse.from(p);
+        return PayslipResponse.from(p, me);
     }
 
-    /** The employee's most recent payslip, if any. */
+    /** The employee's most recent finalised payslip, if any. */
     public PayslipResponse latestForMe(Employee me) {
         return payslips.findByEmployeeIdOrderByPeriodDesc(me.getId()).stream()
+                .filter(PayrollService::visibleToStaff)
                 .findFirst()
-                .map(PayslipResponse::from)
+                .map(p -> PayslipResponse.from(p, me))
                 .orElseThrow(() -> ResourceNotFoundException.of("Payslip", "latest"));
     }
+
 
     // ---------------- Admin run summary (used by the Dashboard) ----------------
 
@@ -330,7 +342,10 @@ public class PayrollService {
                     PayslipFormat.money(p.getPcb()),
                     PayslipFormat.money(p.getDeductions()),
                     PayslipFormat.money(p.getNet()),
-                    p.getStatus()));
+                    p.getStatus(),
+                    unpaidDays(p),
+                    unpaidDaysLabel(p),
+                    unpaidDeductionLabel(p)));
         }
 
         PayslipStatus status = runStatus(run);
@@ -341,6 +356,25 @@ public class PayrollService {
                 PayslipFormat.payDateLabel(payDate),
                 status, PayslipFormat.statusLabel(status),
                 lines);
+    }
+
+    private static BigDecimal unpaidDays(Payslip p) {
+        return p.getUnpaidDays() == null ? BigDecimal.ZERO : p.getUnpaidDays();
+    }
+
+    /** "None" / "1 day" / "2.5 days" — same wording as the staff payslip. */
+    private static String unpaidDaysLabel(Payslip p) {
+        BigDecimal days = unpaidDays(p);
+        if (days.signum() == 0) {
+            return "None";
+        }
+        return PayslipFormat.days(days) + (days.compareTo(BigDecimal.ONE) == 0 ? " day" : " days");
+    }
+
+    /** The unpaid-leave deduction, or null when nothing was deducted (the app hides the row). */
+    private static String unpaidDeductionLabel(Payslip p) {
+        BigDecimal deduction = p.getUnpaidDeduction();
+        return (deduction == null || deduction.signum() <= 0) ? null : PayslipFormat.money(deduction);
     }
 
     /** Run-level status = the least-advanced payslip stage in the run. */

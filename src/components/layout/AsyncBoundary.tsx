@@ -33,6 +33,8 @@ export function AsyncBoundary({ loading, error, onRetry, children, minHeight = 1
         {onRetry && (
           <Pressable
             onPress={onRetry}
+            accessibilityRole="button"
+            accessibilityLabel="Try again"
             style={{ paddingVertical: 9, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line }}
           >
             <Text style={[font(700), { fontSize: 12.5, color: palette.coral }]}>Try again</Text>

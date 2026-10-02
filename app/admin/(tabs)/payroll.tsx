@@ -12,14 +12,9 @@ import {
   useRunPayroll,
 } from '@/api/queries';
 import type { PayrollRun, PayslipStatus } from '@/api/types';
+import { alertError } from '@/lib/errors';
+import { currentPeriod } from '@/lib/period';
 import { palette, font, radius, gradients, tint } from '@/theme';
-
-/** Current period as YYYY-MM, computed without a date library. */
-function currentPeriod(): string {
-  const now = new Date();
-  const month = `${now.getMonth() + 1}`.padStart(2, '0');
-  return `${now.getFullYear()}-${month}`;
-}
 
 function statusChipColors(status: PayslipStatus): { color: string; background: string } {
   switch (status) {
@@ -45,7 +40,7 @@ export default function Payroll() {
 
   const chip = data ? statusChipColors(data.status) : statusChipColors('DRAFT');
 
-  const onRun = () => run.mutate(period);
+  const onRun = () => run.mutate(period, { onError: (e) => alertError("Couldn't run payroll", e) });
 
   const onApprove = () => {
     Alert.alert(
@@ -53,7 +48,7 @@ export default function Payroll() {
       `This locks ${data?.periodLabel ?? 'this run'} for payment. You can still mark it as paid afterwards.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Approve', onPress: () => approve.mutate(period) },
+        { text: 'Approve', onPress: () => approve.mutate(period, { onError: (e) => alertError("Couldn't approve payroll", e) }) },
       ],
     );
   };
@@ -64,7 +59,7 @@ export default function Payroll() {
       `Confirm that ${data?.netLabel ? `RM ${data.netLabel}` : 'this payroll'} has been disbursed to staff. This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Mark as paid', onPress: () => markPaid.mutate(period) },
+        { text: 'Mark as paid', onPress: () => markPaid.mutate(period, { onError: (e) => alertError("Couldn't mark as paid", e) }) },
       ],
     );
   };
@@ -282,12 +277,20 @@ function RunView({ data }: { data: PayrollRun }) {
                     { k: 'Basic', v: line.basicLabel },
                     { k: 'OT', v: line.overtimeLabel },
                     { k: 'Claims', v: line.claimsLabel },
-                    ...(line.unpaidDeductionLabel ? [{ k: 'Unpaid', v: `− RM ${line.unpaidDeductionLabel}` }] : []),
+                    // Unpaid leave: only when something was actually deducted.
+                    ...(line.unpaidDeductionLabel
+                      ? [
+                          {
+                            k: line.unpaidDaysLabel ? `Unpaid · ${line.unpaidDaysLabel}` : 'Unpaid',
+                            v: `− RM ${line.unpaidDeductionLabel}`,
+                          },
+                        ]
+                      : []),
                     { k: 'Deductions', v: line.deductionsLabel },
                   ].map((m) => (
                     <View key={m.k} style={{ flexDirection: 'row', gap: 4 }}>
                       <Text style={[font(500), { fontSize: 11, color: palette.faint }]}>{m.k}</Text>
-                      <Text style={[font(700), { fontSize: 11, color: palette.soft }]}>{m.v}</Text>
+                      <Text style={[font(700), { fontSize: 11, color: palette.soft, fontVariant: ['tabular-nums'] }]}>{m.v}</Text>
                     </View>
                   ))}
                 </View>

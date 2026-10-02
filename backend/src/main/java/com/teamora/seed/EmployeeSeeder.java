@@ -135,7 +135,6 @@ public class EmployeeSeeder implements CommandLineRunner {
                 .role(role)
                 .jobTitle(title)
                 .department(dept)
-                .location(company.getAddress())
                 .staffId(staffId)
                 .joinDate(joined)
                 .active(true)

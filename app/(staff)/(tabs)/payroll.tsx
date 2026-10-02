@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, Alert, type TextStyle } from 'react-native';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
-import { Button, Card, Chip, EmptyState, HeroCard, Icon, IconTile, type IconName } from '@/components/ui';
+import { Button, Card, EmptyState, HeroCard, IconTile, MonthStepper, type IconName } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { usePayslips, useMe } from '@/api/queries';
 import { sharePayslipPdf } from '@/lib/payslipPdf';
 import type { Payslip } from '@/api/types';
+import { periodLabel } from '@/lib/period';
 import { formatDays } from '@/lib/numbers';
-import { palette, font, radius, tint } from '@/theme';
+import { isFinalPayslip, isPaid, payslipStatusLine } from '@/lib/payslip';
+import { palette, font, onDark, radius, tint } from '@/theme';
 
 /** Parse a money label like "4,285.50" → 4285.5. */
 function num(label: string | null | undefined): number {
@@ -49,7 +51,15 @@ function SubtotalRow({ label, amount }: { label: string; amount: string }) {
 export default function Payroll() {
   const q = usePayslips();
   const me = useMe();
-  const payslip = q.data?.[0];
+  // Newest first. Drafts aren't final, so they're never shown to staff.
+  const payslips = (q.data ?? []).filter(isFinalPayslip);
+  // Which period is on screen — null follows the latest payslip.
+  const [period, setPeriod] = React.useState<string | null>(null);
+  const found = period ? payslips.findIndex((p) => p.period === period) : -1;
+  const index = found >= 0 ? found : 0;
+  const payslip = payslips[index];
+  const older = payslips[index + 1];
+  const newer = index > 0 ? payslips[index - 1] : undefined;
   const [downloading, setDownloading] = React.useState(false);
 
   const onDownload = async (p: Payslip) => {
@@ -67,11 +77,19 @@ export default function Payroll() {
     <CollapsingHeaderScreen
       bottomInset={70}
       title="Payslip"
-      accessory={<Chip label={payslip?.periodLabel ?? '—'} background={palette.surface} color={palette.soft} leading={<Icon name="chevD" size={14} color={palette.soft} />} />}
+      accessory={
+        payslip ? (
+          <MonthStepper
+            label={periodLabel(payslip.period, true)}
+            onPrev={older ? () => setPeriod(older.period) : undefined}
+            onNext={newer ? () => setPeriod(newer.period) : undefined}
+          />
+        ) : undefined
+      }
     >
       <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
         {q.data && !payslip && (
-          <EmptyState icon="wallet" title="No payslips yet" subtitle="Your payslips will appear here once payroll runs." tone={{ color: palette.coral, bg: tint.coral }} />
+          <EmptyState icon="wallet" title="No payslips yet" subtitle="Your payslip will appear here once your company approves the month's payroll." tone={{ color: palette.coral, bg: tint.coral }} />
         )}
         {payslip && (
           <>
@@ -79,7 +97,7 @@ export default function Payroll() {
               eyebrow="Net pay · take-home"
               currency="RM"
               amount={payslip.netLabel}
-              pill={{ label: `Paid ${payslip.payDateLabel} · ${payslip.bankLabel}`, dotColor: '#7FB894' }}
+              pill={{ label: payslipStatusLine(payslip), dotColor: isPaid(payslip) ? onDark.live : palette.amber }}
             />
 
             {/* earnings */}

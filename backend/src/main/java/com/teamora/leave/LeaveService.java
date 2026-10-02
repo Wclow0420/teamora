@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -62,6 +63,9 @@ public class LeaveService {
 
         LeaveType type = leaveTypes.requireInCompany(employee.getCompany().getId(), req.leaveTypeId());
 
+        assertNoOverlap(employee, duration, req.startDate(), req.endDate());
+        assertEnoughBalance(employee, type, duration.days(), req.startDate());
+
         LeaveRequest entity = LeaveRequest.builder()
                 .employee(employee)
                 .leaveType(type)
@@ -83,6 +87,73 @@ public class LeaveService {
                 "New leave request",
                 employee.getFullName() + " requested " + type.label() + " (" + response.durationLabel() + ")");
         return response;
+    }
+
+    /**
+     * Reject a request that double-books dates the employee has already asked for
+     * (PENDING) or been granted (APPROVED). Partial-day requests may share a day —
+     * a morning and an afternoon half day, or hourly requests — but a full day
+     * clashes with anything on the same date, and so do two half days in the same
+     * period.
+     */
+    private void assertNoOverlap(Employee employee, LeaveDurationCalculator.Duration duration,
+                                 LocalDate startDate, LocalDate endDate) {
+        List<LeaveRequest> existing = requests.findOverlapping(employee.getId(),
+                List.of(LeaveStatus.PENDING, LeaveStatus.APPROVED), startDate, endDate);
+        for (LeaveRequest other : existing) {
+            if (clashes(duration.unit(), duration.halfDayPeriod(), other)) {
+                throw new BadRequestException("You already have a leave request covering these dates.");
+            }
+        }
+    }
+
+    private static boolean clashes(LeaveDurationUnit unit, HalfDayPeriod period, LeaveRequest other) {
+        LeaveDurationUnit otherUnit = other.getDurationUnit() == null
+                ? LeaveDurationUnit.FULL_DAY : other.getDurationUnit();
+        if (unit == LeaveDurationUnit.FULL_DAY || otherUnit == LeaveDurationUnit.FULL_DAY) {
+            return true;
+        }
+        if (unit == LeaveDurationUnit.HALF_DAY && otherUnit == LeaveDurationUnit.HALF_DAY) {
+            // AM + PM coexist; the same half (or an unknown one) is a double booking.
+            return period == null || other.getHalfDayPeriod() == null || period == other.getHalfDayPeriod();
+        }
+        return false;   // hourly alongside hourly / a half day
+    }
+
+    /**
+     * For leave types that track an entitlement (accrual != NONE), the request must fit
+     * in what is available right now in the leave year it starts in, less whatever is
+     * already waiting for approval for that type and year. Untracked types (unpaid
+     * leave etc.) are never blocked.
+     */
+    private void assertEnoughBalance(Employee employee, LeaveType type, BigDecimal requestedDays, LocalDate startDate) {
+        if (type.getAccrual() == LeaveAccrual.NONE) {
+            return;
+        }
+        int startMonth = leaveBalances.startMonth(employee.getCompany());
+        int leaveYear = LeaveYear.yearOf(startDate, startMonth);
+        BigDecimal remaining = leaveBalances.ensureBalance(employee, type, leaveYear)
+                .available(startMonth, LocalDate.now());
+
+        BigDecimal pending = BigDecimal.ZERO;
+        for (LeaveRequest r : requests.findByEmployeeAndTypeAndStatus(employee.getId(), type.getId(), LeaveStatus.PENDING)) {
+            if (r.getDays() != null && LeaveYear.yearOf(r.getStartDate(), startMonth) == leaveYear) {
+                pending = pending.add(r.getDays());
+            }
+        }
+
+        BigDecimal available = remaining.subtract(pending).max(BigDecimal.ZERO);
+        BigDecimal requested = requestedDays == null ? BigDecimal.ZERO : requestedDays;
+        if (requested.compareTo(available) > 0) {
+            throw new BadRequestException("Not enough " + type.label() + " balance — you have "
+                    + plainDays(available) + " day(s) available.");
+        }
+    }
+
+    /** 3.00 → "3", 0.50 → "0.5". */
+    private static String plainDays(BigDecimal v) {
+        BigDecimal stripped = v.stripTrailingZeros();
+        return (stripped.scale() < 0 ? stripped.setScale(0) : stripped).toPlainString();
     }
 
     /**

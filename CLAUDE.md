@@ -246,7 +246,8 @@ scroll handler interpolating header height + element scale.
 `AuthContext` (`src/context/AuthContext.tsx`) does real auth against the API:
 `signIn(email, password)` stores the JWTs, `signOut()` revokes + clears them,
 and the session is restored on launch via `/api/auth/me`. It exposes
-`status` (`loading | authenticated | unauthenticated`), the `employee`, and the
+`status` (`loading | authenticated | unauthenticated | offline` — `offline` keeps the
+session and shows a retry screen; only a 401/403 signs out), the `employee`, and the
 `role`.
 
 **One login; role decides the app.** Both experiences ship in one binary:
@@ -359,9 +360,19 @@ needed. Full details in `backend/README.md`.
 - **Layout:** package-by-feature under `com.teamora` (`auth`, `company`,
   `employee`, `attendance`, `leave`, `claim`, `overtime`, `payroll`, `calendar`,
   `schedule`, `notification`, + `config`, `security`, `common`, `seed`).
-- **Migrations:** currently `V1`–`V10` (init → multi-tenancy & roles →
+- **Migrations:** currently `V1`–`V19` (init → multi-tenancy & roles →
   reporting-manager + single-owner → overtime → schedule → company events →
-  notifications → push tokens → employee monthly_salary → tax profile + payslip PCB).
+  notifications → push tokens → employee monthly_salary → tax profile + payslip PCB →
+  configurable comp + leave types → work locations → clock-in photo → employee
+  statutory/bank → partial-day leave → leave accrual/carry-forward → claim receipt
+  photo → QA round 2 (work start time, late grace, override flag, per-company
+  staff id) → work start time as `HH:mm` text).
+- **Wall-clock times are stored as `HH:mm` text** (`common.HhMmConverter`), not SQL
+  `TIME` — a `TIME` column goes through the JDBC time-zone conversion and a
+  migration default reads back shifted.
+- **Dev deploy without an image rebuild:** `./scripts/test-backend.sh` builds the
+  jar; `docker cp target/teamora-api-1.0.0.jar teamora-api:/app/app.jar && docker
+  restart teamora-api` applies new migrations on start.
 
 ### Multi-tenancy & roles
 - The **company** is the tenant. Every tenant-scoped entity extends

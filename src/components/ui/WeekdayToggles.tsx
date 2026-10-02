@@ -8,13 +8,15 @@ type Props = {
   /** Working-weekday bitmask (bit0=Mon … bit6=Sun). */
   value: number;
   onChange: (mask: number) => void;
+  /** Inline validation message (e.g. no day selected). */
+  error?: string | null;
 };
 
 /**
  * Seven Mon–Sun toggles that read/write a weekday bitmask. Selected days are
  * ink-filled (working days); unselected are rest days.
  */
-export function WeekdayToggles({ label, value, onChange }: Props) {
+export function WeekdayToggles({ label, value, onChange, error }: Props) {
   return (
     <View>
       {label && <Text style={[font(700), { fontSize: 12, color: palette.soft, marginBottom: 8 }]}>{label}</Text>}
@@ -35,7 +37,7 @@ export function WeekdayToggles({ label, value, onChange }: Props) {
                 alignItems: 'center',
                 backgroundColor: on ? palette.ink : palette.surface,
                 borderWidth: on ? 0 : 1,
-                borderColor: palette.line,
+                borderColor: error ? palette.danger : palette.line,
               }}
             >
               <Text style={[font(700), { fontSize: 11.5, color: on ? palette.white : palette.faint }]}>
@@ -45,6 +47,7 @@ export function WeekdayToggles({ label, value, onChange }: Props) {
           );
         })}
       </View>
+      {error && <Text style={[font(600), { fontSize: 11.5, lineHeight: 16, color: palette.danger, marginTop: 6 }]}>{error}</Text>}
     </View>
   );
 }

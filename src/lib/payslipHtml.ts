@@ -1,4 +1,5 @@
 import type { EmployeeResponse, Payslip } from '@/api/types';
+import { payslipStatusLine } from './payslip';
 
 /**
  * Pure HTML builder for the payslip PDF document (no native deps, so it's testable
@@ -97,7 +98,7 @@ export function payslipHtml(p: Payslip, employee: EmployeeResponse | null, gener
         <tr>
           <td>
             <div style="font-size:15px;font-weight:700;">${esc(name)}${staffId}</div>
-            <div style="font-size:12px;color:${C.faint};margin-top:4px;">Pay date ${esc(p.payDateLabel)} · ${esc(p.bankLabel)}</div>
+            <div style="font-size:12px;color:${C.faint};margin-top:4px;">${esc(payslipStatusLine(p))}</div>
           </td>
           <td style="text-align:right;">
             <div style="font-size:11px;color:${C.faint};text-transform:uppercase;letter-spacing:0.5px;">Net pay</div>

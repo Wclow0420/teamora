@@ -22,7 +22,7 @@ wording, that is either a bug or this document is stale — fix one of them.
 
 | Pass | When | What to run | Time |
 | --- | --- | --- | --- |
-| **Smoke** | Every OTA update, every backend deploy, before handing a build to anyone | Section **H** only | ~10 min |
+| **Smoke** | Every OTA update, every backend deploy, before handing a build to anyone | Section **H** only | ~15 min |
 | **Full regression** | Before every store / preview binary, after any migration, after any payroll or leave-engine change | Sections **A → G** in order, then **H** on the final build | ~3–4 h (one tester, two devices) |
 
 Rules for a pass:
@@ -38,9 +38,9 @@ Rules for a pass:
 | Environment | How to get it | Use it for | Cannot test |
 | --- | --- | --- | --- |
 | **Expo Go** (`npm run start`, scan QR) | Dev machine + phone on the same Wi-Fi; API auto-resolves to the Mac's LAN IP on port 8080 | Most flows: auth, leave, claims, overtime, calendar, payslip + PDF, all admin screens | Remote push (registration is skipped in Expo Go) |
-| **iOS Simulator** (`npm run ios`) | Xcode simulator | Layout, navigation, forms, simulated location (Features → Location) | **No camera** (selfie must be tested on a physical device); push registration is skipped |
+| **iOS Simulator** (`npm run ios`) | Xcode simulator | Layout, navigation, forms, simulated location (Features → Location) | **No camera** (the clock-in selfie and claim receipt capture must be tested on a physical device); push registration is skipped |
 | **Android emulator** (`npm run android`) | API base falls back to `10.0.2.2:8080` | Android layout, back button, keyboard | Push |
-| **Preview build** (`npx eas build -p ios\|android --profile preview`) | Internal distribution; `APP_ENV=preview`; API URL comes from `eas.json` (currently an ngrok tunnel — it must be running) | Everything native: selfie camera, real GPS geofence, push delivery, share sheet, file export | — |
+| **Preview build** (`npx eas build -p ios\|android --profile preview`) | Internal distribution; `APP_ENV=preview`; API URL comes from `eas.json` (currently an ngrok tunnel — it must be running) | Everything native: selfie camera, claim receipt camera, real GPS geofence, push delivery, share sheet, file export | — |
 | **Production build** (`--profile production`) | `APP_ENV=production` | Final smoke; confirm no demo credentials on the login screen | — |
 
 Backend: `cd backend && docker compose up --build` → API `:8080`, Swagger
@@ -99,12 +99,15 @@ Manual QA does **not** need to re-prove the API rules below — it must prove th
 | Area | Test classes | Already covered |
 | --- | --- | --- |
 | Auth, RBAC, tenancy | `auth/AuthAndTenantIT` | Login returns role + company; bad credentials 401; employee 403 on admin APIs; unauthenticated 401; register creates company + owner isolated from other tenants; duplicate email rejected |
+| Passwords | `auth/PasswordIT` | Change password: 401; wrong current / too short / missing / same-as-current → 400; new password signs in and the old one fails; all sessions revoked, except the one whose refresh token is sent; cannot spare someone else's session. Reset: HR resets an employee who can then sign in and is signed out; manager + employee 403; HR cannot reset the owner (403); owner can reset HR; too short 400; cross-tenant 404 |
 | Approval routing | `approval/ApprovalRoutingIT` | Manager sees only direct reports; cannot approve a non-report (403) while the owner can; owner sees all pending |
 | Clock-in selfie | `attendance/ClockInPhotoIT` | Photo stored and flagged on live board; photo readable by self and same-company admin; other company 403; unauthenticated 401; data-URL prefix handled; > 2 MB rejected; clock-in without photo works |
 | Geofence | `attendance/GeofenceClockInIT`, `common/GeoUtilTest` | Inside radius OK; outside radius rejected with distance message; assigned but no coordinates rejected; unassigned clocks in without coordinates; inactive site = no geofence; distance maths |
 | Calendar | `calendar/CalendarIT`, `calendar/CalendarAdminIT` | Month grid + upcoming; default month; HR creates/patches/deletes a holiday and it appears on both calendars; manager read-only, employee no access; blank title / missing date / BIRTHDAY type rejected; tenant-scoped (foreign admin 404); 401s |
 | Dashboard | `dashboard/DashboardIT` | HR admin summary; manager allowed; employee 403; unauthenticated 401 |
 | Employees | `employee/EmployeeManagementIT`, `employee/EmployeePartialUpdateIT`, `employee/OwnershipTransferIT` | Update name/title/department/role; cannot change own role; cross-tenant update blocked; employee cannot update; reporting manager must be managerial; **partial PATCH leaves manager + work location untouched**; explicit clear flags; id wins over clear flag; cannot report to self; cross-company manager / location ids 400; ownership transfer swaps roles; non-owner 403; no second owner via create / update / change-role |
+| My details | `employee/SelfProfileIT` | `PATCH /api/employees/me` trims, saves and clears the caller's phone; every other field in the body is ignored; phone > 32 characters 400; employee still 403 on the admin update; 401 |
+| Claim receipts | `claim/ClaimReceiptIT` | Claim with a receipt is flagged on the list and the approvals queue; claimant and approvers can fetch the photo; data-URL prefix handled; unrelated employee and non-approving manager 403; other company cannot fetch; 401; oversized / invalid photo 400 and no claim created; claim without a receipt works and its receipt is 404 |
 | Leave engine | `leave/LeaveFlowIT`, `leave/LeaveTypeConfigIT`, `leave/PartialLeaveIT`, `leave/LeaveAccrualIT`, `leave/LeaveYearTest` | Apply → pending → approve; employee cannot approve; leave-type CRUD RBAC; half day = 0.5; 2 h of 8 h = 0.25; full-day range counts working days only; half-day / hours reject a date range; hours must be > 0 and ≤ a working day; range with no working days rejected; leave on a public holiday rejected; end before start rejected; fixed / monthly / none accrual; join-date proration; carry-forward cap; entitlement override incl. negative balance; override RBAC; leave-year start month validation; next-leave-year charging |
 | Work locations | `location/WorkLocationConfigIT` | CRUD RBAC; radius < 50 rejected; blank name / missing coordinates rejected; tenant-scoped; 401s |
 | Notifications | `notification/NotificationIT`, `notification/NotificationFlowIT` | List + mark all read; approving leave notifies the requester; push-token register is idempotent; 401 |
@@ -117,7 +120,8 @@ Manual QA does **not** need to re-prove the API rules below — it must prove th
 **Not covered by automation (manual QA is the only safety net):** every screen's
 layout and wording, navigation, permission prompts, camera, GPS, share sheet,
 push delivery, the payslip PDF, token refresh on the device, offline behaviour,
-and the claims list / claim submit endpoints (no dedicated claim IT).
+the receipt camera and photo viewer, and the claims list totals / claim decisions
+(`ClaimReceiptIT` covers only the receipt photo).
 
 ### 0.7 Case format
 
@@ -244,12 +248,12 @@ Pass type: Smoke / Full           Result: PASS / FAIL (list IDs)
 - Steps: 1. Open Login on the dev (Metro) or preview build. 2. Open Login on the production build.
 - Expect: dev / preview shows the helper line "Demo — staff: amir@lumi.com · admin: sarah@lumi.com (password: password)."; the **production build shows no demo credentials at all**.
 
-#### AUTH-15 — "Forgot password?" is real or absent
+#### AUTH-15 — "Forgot password?" explains how to get a reset
 - [ ] Pass
 - Account: none
 - Pre: on Login
-- Steps: 1. Tap **Forgot password?** (if present).
-- Expect: it either starts a real reset flow or is not shown. A coral link that does nothing is a fail.
+- Steps: 1. Tap the coral **Forgot password?** link under the Password field. 2. Dismiss the alert. 3. Check the fields.
+- Expect: a system alert titled "Forgot your password?" with the message "Ask your HR admin to reset your password. They can set a new one from your employee page." and an OK button. Nothing is sent, no email is promised, and no other screen opens — there is **no** self-service / email reset; the real path is an HR admin reset (ADM-EMP-36). Any email already typed is still there after dismissing. A link that does nothing is a fail.
 
 #### AUTH-16 — Password field is masked; Back returns to Onboarding
 - [ ] Pass
@@ -324,6 +328,70 @@ Pass type: Smoke / Full           Result: PASS / FAIL (list IDs)
 - Pre: signed in as Amir; open Home, Leave, Payroll and Profile so data is cached
 - Steps: 1. Log out. 2. Immediately sign in as Arjun. 3. Open Home, Leave, Payroll, Profile.
 - Expect: every screen shows **Arjun's** name, balances and payslip from the first frame — never Amir's name, initial or numbers, not even briefly.
+
+### A.5 Change my password (`src/components/account/ChangePasswordScreen.tsx`, `app/(staff)/change-password.tsx`, `app/admin/change-password.tsx`)
+
+One shared screen, reached from both Profile tabs. These cases change a seeded
+account's password — use **Arjun** (and Sarah where stated), and afterwards change
+it back to `password` (allowed: it is 8 characters and differs from the current
+one) or reset the data (0.5), otherwise later cases cannot sign in. Test password
+used below: `Teamora-qa-1`. Admin-side reset is under D.7 (ADM-EMP-35 → 40).
+
+#### AUTH-26 — Change password is reachable from both apps
+- [ ] Pass
+- Account: `arjun@lumi.com`, then `sarah@lumi.com`
+- Pre: signed in
+- Steps: 1. Staff app: Profile → first menu card → **Change password**. 2. Tap the back chevron. 3. Admin app: Profile → **Change password** (last row). 4. Back.
+- Expect: both open the same screen titled "Change password" with three masked fields — **Current password**, **New password** (placeholder "At least 8 characters"), **Confirm new password** — a "Show passwords" checkbox, a **Change password** button and the hint "Forgotten your current password? Ask your HR admin to reset it for you." Back returns to the Profile tab it was opened from; no tab bar on the screen.
+
+#### AUTH-27 — Change password (happy path): new one works, old one does not
+- [ ] Pass
+- Account: `arjun@lumi.com`
+- Pre: on Change password; current password is `password`
+- Steps: 1. **Current password**: `password`. 2. **New password**: `Teamora-qa-1`. 3. **Confirm new password**: `Teamora-qa-1`. 4. Tap **Change password**. 5. Dismiss the alert. 6. Profile → **Log out**. 7. Sign in with `password`. 8. Sign in with `Teamora-qa-1`.
+- Expect: the button reads "Saving…" and is disabled while pending; an alert "Password changed" — "Use your new password the next time you sign in. You've been signed out on your other devices."; the screen closes back to Profile and Arjun is **still signed in** on this device. Step 7 fails with the normal wrong-password error (AUTH-10); step 8 signs in.
+
+#### AUTH-28 — Wrong current password
+- [ ] Pass
+- Account: `arjun@lumi.com`
+- Pre: on Change password
+- Steps: 1. **Current password**: `not-my-password`. 2. New + confirm: `Teamora-qa-2`. 3. Tap **Change password**. 4. Log out and sign in with the password that was valid before this case.
+- Expect: "Saving…", then the red message "Current password is incorrect" **under the Current password field** (not at the bottom of the form); the screen stays open with all three fields kept; no "Password changed" alert. Step 4 signs in — the password was not changed and the session was not ended.
+
+#### AUTH-29 — New password rules are caught before any request
+- [ ] Pass
+- Account: `arjun@lumi.com`
+- Pre: on Change password, all fields empty
+- Steps: 1. Tap **Change password** with everything blank. 2. Correct current password, new + confirm `short12` (7 characters). 3. New + confirm of 73 characters. 4. New + confirm identical to the current password.
+- Expect: 1 → "Enter your current password." under Current and "Use at least 8 characters." under New; 2 → "Use at least 8 characters."; 3 → "Keep it to 72 characters or fewer."; 4 → "Choose a password different from your current one." Each message sits under its own field, the button never shows "Saving…", and the password is unchanged. Exactly 8 and exactly 72 characters are accepted.
+
+#### AUTH-30 — Confirmation must match
+- [ ] Pass
+- Account: `arjun@lumi.com`
+- Pre: on Change password
+- Steps: 1. Correct current password. 2. **New password**: `Teamora-qa-3`. 3. **Confirm new password**: `Teamora-qa-4`. 4. Tap **Change password**. 5. Fix the confirmation and submit.
+- Expect: step 4 → "This doesn't match your new password." under the Confirm field; nothing is sent and the password is unchanged (the old one still signs in). Step 5 succeeds as in AUTH-27. A confirmation that differs only by letter case or a trailing space is also a mismatch.
+
+#### AUTH-31 — "Show passwords" toggle
+- [ ] Pass
+- Account: `arjun@lumi.com`
+- Pre: on Change password with text in all three fields
+- Steps: 1. Tap **Show passwords**. 2. Tap it again. 3. With VoiceOver / TalkBack on, focus the control.
+- Expect: ticked → the box fills coral with a white tick and **all three** fields show plain text; unticked → all three are masked again; the typed values are not lost either way. The control is announced as a checkbox with its checked state. No auto-capitalisation on any of the fields.
+
+#### AUTH-32 — This device stays signed in; every other device is signed out
+- [ ] Pass
+- Account: `arjun@lumi.com` on device A **and** device B
+- Pre: both devices signed in and showing data
+- Steps: 1. On A, change the password (AUTH-27 steps 1–5). 2. On A, open Leave and Claims, then force-quit and relaunch. 3. On B, keep using the app (open Leave, Claims, Payroll) for up to 30 minutes — or shorten the access-token lifetime as in X-SES-01. 4. On B, sign in with the old password, then the new one.
+- Expect: A is never interrupted: data loads, and after relaunch the session is restored straight to Home. B is **not** signed out instantly — it keeps working until its access token expires (≤ 30 min, `access-token-ttl-minutes`), then the next request returns it to the signed-out flow (Onboarding / Login), not to a screen of error boxes (X-SES-02). On B the old password is rejected and the new one signs in. Log how long B stayed usable.
+
+#### AUTH-33 — Save failure keeps the form
+- [ ] Pass
+- Account: `arjun@lumi.com`
+- Pre: on Change password with valid values; then Airplane mode (or `docker compose stop api`)
+- Steps: 1. Tap **Change password**. 2. Restore the connection and tap it again.
+- Expect: offline → "Could not change your password. Check your connection and try again." in red above the button; all three fields keep their values; no alert, no navigation. Online → succeeds once (double-tapping the button does not send two requests).
 
 ---
 
@@ -689,7 +757,7 @@ Default account: **`amir@lumi.com`** unless a case says otherwise.
 - Steps: 1. Apply Emergency Leave, Full day, 5 working days. 2. Have it approved.
 - Expect: **current behaviour** — the request is accepted and, once approved, the tile shows a negative remaining (e.g. "-2"). Verify the negative number renders cleanly and the progress bar does not overflow. (Blocking over-entitlement is not built — see Known limitations.)
 
-### B.5 Claims (`app/(staff)/claims.tsx`, `claim-submit.tsx`)
+### B.5 Claims (`app/(staff)/claims.tsx`, `claim-submit.tsx`, `src/components/claims/*`, `src/components/media/*`)
 
 #### STF-CLM-01 — Claims overview
 - [ ] Pass
@@ -730,8 +798,8 @@ Default account: **`amir@lumi.com`** unless a case says otherwise.
 - [ ] Pass
 - Account: Amir
 - Pre: at least one claim
-- Steps: 1. Look at the left thumbnail of a claim row and at the **Add a claim** button icon (a camera).
-- Expect: the app must not imply a receipt photo exists when none can be attached. A striped placeholder labelled "rcpt" or a camera icon with no capture step is a fail to log (receipt upload is not built — see Known limitations).
+- Steps: 1. Look at the left slot of each claim row and at the **Add a claim** button icon (a camera). 2. Tap **Add a claim**.
+- Expect: a row shows a photo **only** when that claim really has a receipt (STF-CLM-15); every other row shows a neutral grey receipt-icon tile (STF-CLM-16). A striped placeholder labelled "rcpt", a stock picture, or a broken-image box is a fail. The camera icon is honest: the form it opens has an **Add receipt photo** step (STF-CLM-09).
 
 #### STF-CLM-07 — Empty state
 - [ ] Pass
@@ -746,6 +814,96 @@ Default account: **`amir@lumi.com`** unless a case says otherwise.
 - Pre: Nadia approves one claim and declines another (MGR-06)
 - Steps: 1. Open Claims.
 - Expect: chips change to Approved / Rejected; the pending total drops by both amounts; "reimbursed this month" rises only by the approved amount (if its date is this month).
+
+**Receipt photos** (STF-CLM-09 → 20). One optional photo per claim, taken with
+the **back camera** at submit time; stored on the server and served by
+`GET /api/claims/{id}/receipt`. Cases marked *physical device* cannot be run in
+the iOS Simulator (no camera) — to get a claim with a receipt there, create it
+through Swagger (`POST /api/claims` with a `receiptBase64` JPEG).
+
+#### STF-CLM-09 — Receipt field, default state
+- [ ] Pass
+- Account: Amir
+- Pre: on "New claim" (any environment)
+- Steps: 1. Scroll to the field under **Date**.
+- Expect: label "Receipt photo (optional)"; a card with a coral camera tile, "Add receipt photo", the line "Helps your approver check the claim faster." and a chevron; **Submit claim** sits below it. Nothing suggests a receipt is already attached.
+
+#### STF-CLM-10 — Take a receipt photo
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: on "New claim" with a category, title, amount and date already entered; camera permission not yet decided
+- Steps: 1. Tap **Add receipt photo**. 2. Allow the camera when prompted. 3. Read the capture screen. 4. Point at a paper receipt and tap the round shutter.
+- Expect: a full-screen **back**-camera view slides up (not the selfie camera) with a close (X) button top-left and the chip "Fit the whole receipt in the frame"; under the shutter the hint goes "Starting camera…" → "Tap to take the photo" (the shutter is dimmed until ready) → "Saving photo…" with a light haptic. The camera then closes and the field shows a 64 px thumbnail of the photo, a sage tick with "Receipt attached", and the links **Retake** (coral) and **Remove** (red). The category, title, amount and date typed earlier are untouched. (Log the wording of the OS permission prompt — it currently mentions only the clock-in photo.)
+
+#### STF-CLM-11 — Preview the captured receipt before submitting
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: a receipt is attached on the form (STF-CLM-10)
+- Steps: 1. Tap the thumbnail. 2. Tap anywhere on the photo. 3. Open it again and tap the X.
+- Expect: a dark full-screen viewer titled "Receipt photo" with the caption "Tap anywhere to close"; the **whole** photo is shown (fitted, not cropped), upright, and the amount on the receipt is readable. Either tap closes it and returns to the form with every field and the receipt intact. Android hardware back also closes only the viewer.
+
+#### STF-CLM-12 — Retake replaces the photo
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: a receipt is attached on the form
+- Steps: 1. Tap **Retake** and photograph a visibly different receipt. 2. Tap **Retake** again, then close the camera with X without taking a photo.
+- Expect: step 1 → the thumbnail (and the preview) now show the **new** photo; there is still exactly one receipt. Step 2 → the camera closes and the previous photo is **kept** — cancelling a retake never clears the receipt.
+
+#### STF-CLM-13 — Remove the receipt
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: a receipt is attached on the form
+- Steps: 1. Tap **Remove**. 2. Tap **Submit claim**.
+- Expect: the field returns to the "Add receipt photo" card (no thumbnail, no leftover note); the claim is submitted **without** a receipt and its list row shows the neutral tile (STF-CLM-16).
+
+#### STF-CLM-14 — Cancel the camera without taking a photo
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: on "New claim" with fields filled, no receipt yet
+- Steps: 1. Tap **Add receipt photo**. 2. Tap the X (on Android also try the hardware back button).
+- Expect: back on the form with no receipt, no error note, and every typed value still there. The form itself is not closed.
+
+#### STF-CLM-15 — Submit a claim with a receipt → thumbnail in the list
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: on "New claim": Meal, "QA lunch receipt", `23.40`, today, receipt attached; note the pending total
+- Steps: 1. Tap **Submit claim**. 2. While it reads "Submitting…", tap **Retake** / **Remove**. 3. Read the new row on Claims.
+- Expect: "Submitting…" with the button disabled; Retake / Remove do nothing while it is pending; the form closes. The new row "QA lunch receipt · RM 23.40 · Pending" shows the **real photo** as its 46 px thumbnail (not the grey tile), and the pending total rises by exactly 23.40. No duplicate claim.
+
+#### STF-CLM-16 — Submit a claim without a receipt
+- [ ] Pass
+- Account: Amir
+- Pre: on "New claim" (any environment), receipt field untouched
+- Steps: 1. Fill category, title, amount, date. 2. Tap **Submit claim**. 3. Tap the left tile of the new row.
+- Expect: the claim is accepted exactly as before (a receipt is optional — no warning, no block). Its row shows a neutral grey receipt-icon tile; tapping it does nothing — no viewer, no broken image, no spinner.
+
+#### STF-CLM-17 — Full-screen receipt viewer from the list
+- [ ] Pass
+- Account: Amir
+- Pre: a claim with a receipt exists (STF-CLM-15, or one created through Swagger when on the simulator)
+- Steps: 1. On Claims, tap the photo thumbnail. 2. Close it. 3. Force-quit, relaunch and open it again. 4. Sign in as Amir on a second device and open it there.
+- Expect: the viewer title is the claim title and the caption is "RM <amount> · <date>" (e.g. "RM 23.40 · 2 Oct"); the photo is the one that was taken, complete and upright; tap anywhere or X closes it and the list is unchanged. It still loads after a relaunch and on the second device (it is stored on the server, not on the phone). If the photo cannot be fetched the row falls back to the grey tile, and the viewer shows "Couldn't load this photo. Close and try again." — never a broken image.
+
+#### STF-CLM-18 — Camera permission denied → claim still goes in
+- [ ] Pass
+- Account: Amir — **Physical device only** (the iOS Simulator has no camera)
+- Pre: camera permission **denied** for Teamora (deny the prompt, or switch Camera off in system Settings)
+- Steps: 1. On "New claim", tap **Add receipt photo**. 2. Tap it a second time. 3. Fill the form and tap **Submit claim**.
+- Expect: no camera opens and nothing crashes; a grey note appears under the field: "Camera access is off, so this claim will go in without a photo. To attach one, allow Camera for Teamora in your phone's Settings." A second tap shows the same note (iOS does not prompt again; Android may ask once more). The rest of the form works and the claim is submitted **without** a receipt (grey tile in the list; approver sees "No receipt attached", MGR-17).
+
+#### STF-CLM-19 — Size cap: a photo over 2 MB is refused and no claim is created
+- [ ] Pass
+- Account: Amir (Swagger with his token), then Amir on a phone — step 4 is **Physical device only** (the iOS Simulator has no camera)
+- Pre: note the number of claims and the pending total
+- Steps: 1. `POST /api/claims` with a valid body plus a `receiptBase64` that decodes to more than 2 MB. 2. The same with `"receiptBase64": "not-base64!!"`. 3. `GET /api/claims`. 4. On the phone, photograph a large, detailed receipt close up and submit.
+- Expect: 1 → **400** "Photo too large (max 2 MB). Please retake."; 2 → **400** "Invalid photo encoding"; 3 → neither call created a claim and the pending total is unchanged. 4 → the app never shows the 400: it compresses (and re-shoots harder if needed) so the claim goes in; at worst the camera closes with the note "That photo came out too large to upload. Try again a little further from the receipt, or submit without one." and the claim can still be submitted.
+
+#### STF-CLM-20 — Only the claimant and their approver can fetch a receipt (API)
+- [ ] Pass
+- Account: Swagger, with tokens for Amir, Nadia, Sarah, owner, Arjun, a second manager, `admin@nusantara.com`
+- Pre: Amir has a claim with a receipt and one without; take both ids from `GET /api/claims`; promote the QA employee to Manager for the "second manager" (ADM-EMP-14)
+- Steps: 1. `GET /api/claims/{id}/receipt` as Amir, Nadia (his manager), Sarah and the owner. 2. As Arjun (another employee in the same company). 3. As the second manager (not Amir's manager). 4. As `admin@nusantara.com` and `budi@nusantara.com`. 5. With no token. 6. As Amir for the claim **without** a receipt.
+- Expect: 1 → **200** with an `image/jpeg` body each time; 2 → **403**; 3 → **403**; 4 → **404** (another company cannot even tell the claim exists); 5 → **401**; 6 → **404**. In the app, Arjun's and Nusantara's Claims / Approvals screens never list Amir's claim or show his receipt.
 
 ### B.6 Overtime (`app/(staff)/overtime-submit.tsx`)
 
@@ -902,7 +1060,7 @@ Default account: **`amir@lumi.com`** unless a case says otherwise.
 - Steps: 1. Amir submits one leave, one claim and one overtime. 2. Nadia opens Notifications. 3. Nadia approves the leave, declines the claim, approves the overtime. 4. Amir opens Notifications.
 - Expect: Nadia has three approval-request items (leave reads "Amir Hakim requested Annual Leave (<duration>)"). Amir has "Leave approved", a claim-declined item and an overtime-approved item. Nobody receives a notification about their own action.
 
-### B.10 Profile (`app/(staff)/(tabs)/profile.tsx`)
+### B.10 Profile & My details (`app/(staff)/(tabs)/profile.tsx`, `my-details.tsx`)
 
 #### STF-PRO-01 — Identity card and stats are real
 - [ ] Pass
@@ -916,7 +1074,7 @@ Default account: **`amir@lumi.com`** unless a case says otherwise.
 - Account: Amir
 - Pre: on Profile
 - Steps: 1. Tap every row in the menu card. 2. Tap the edit (pencil) button in the header, if present.
-- Expect: **every visible row and button opens a real screen** (e.g. Payslips → the Payslip tab). Rows with no destination — "Personal information", "Employment details", "Documents & contracts", "App settings", "Privacy & security" — and a pencil that does nothing must **not be shown**. No row displays an invented count.
+- Expect: **every visible row and button opens a real screen**. First card: **My details** → My details (STF-PRO-05), **Change password** → Change password (AUTH-26). Second card: **Payslips** → the Payslip tab, **Leave**, **Claims**, **Notifications**. Rows with no destination — "Personal information", "Employment details", "Documents & contracts", "App settings", "Privacy & security" — and a pencil that does nothing must **not be shown**. No row displays an invented count.
 
 #### STF-PRO-03 — Missing optional fields
 - [ ] Pass
@@ -931,6 +1089,66 @@ Default account: **`amir@lumi.com`** unless a case says otherwise.
 - Pre: on Profile
 - Steps: 1. Tap **Log out**.
 - Expect: Onboarding screen (see AUTH-23).
+
+**My details** (STF-PRO-05 → 12). Profile → **My details**: a read-only view of
+the employee's own record plus the one thing they may change themselves — their
+phone number (`PATCH /api/employees/me`). Staff app only (employees and managers).
+
+#### STF-PRO-05 — My details shows what HR has on file
+- [ ] Pass
+- Account: Amir
+- Pre: on Profile
+- Steps: 1. Tap **My details** (first row of the first card). 2. Read the card top to bottom. 3. Compare with Sarah → Staff → Amir Hakim.
+- Expect: title "My details", subtitle "Amir Hakim"; one card with eight rows in this order, label on the left and value bold on the right: **Email** amir@lumi.com · **Staff ID** EMP-042 · **Job title** Sales Executive · **Department** Retail · **Reporting manager** Nadia Rahman · **Work location** (the assigned site name; if no site is assigned, the location on file) · **Joined** 1 Feb 2024 · **Role** Employee. Under the card: "Something wrong here? Only your HR admin can change these — let them know.", then a **Phone** field and a **Save phone number** button. Every value equals what the admin hub shows — nothing invented.
+
+#### STF-PRO-06 — The eight rows are read-only
+- [ ] Pass
+- Account: Amir
+- Pre: on My details
+- Steps: 1. Tap and long-press each of the eight rows and their values.
+- Expect: nothing opens and no keyboard appears; the rows have no chevron, pencil or input styling. **Phone** is the only editable control on the screen.
+
+#### STF-PRO-07 — Missing values read "Not set"; no manager reads as the owner approving
+- [ ] Pass
+- Account: an employee created via Add employee with no job title / department / staff ID / join date / manager; then Nadia
+- Pre: none
+- Steps: 1. Open My details as the new employee. 2. Open My details as Nadia.
+- Expect: empty fields show a grey "Not set" (Staff ID, Job title, Department, Joined, and Work location when none) — never "null", "undefined", a dash or an invented value; **Reporting manager** reads "Company owner approves"; Role "Employee". Nadia: Role "Manager" and Reporting manager "Company owner approves" (she has none). Long values wrap to at most two lines without overlapping the label.
+
+#### STF-PRO-08 — Add and change my phone number
+- [ ] Pass
+- Account: Amir
+- Pre: on My details; phone empty (placeholder "Not set — e.g. 012-345 6789")
+- Steps: 1. Check the button before typing. 2. Type `0123456789` (a phone keypad appears). 3. Tap **Save phone number**. 4. Go back to Profile and open My details again. 5. Change it to `0198765432` and save. 6. Force-quit and relaunch.
+- Expect: **Save phone number** is disabled until the text differs from the saved value; on save it reads "Saving…", then a sage tick with "Phone number saved." appears and the button is disabled again. The number is still there after re-opening and after a relaunch (step 6 shows `0198765432`). Typing again hides the "saved" line. The eight read-only rows are unchanged.
+
+#### STF-PRO-09 — Clear my phone number
+- [ ] Pass
+- Account: Amir
+- Pre: a phone number is saved (STF-PRO-08)
+- Steps: 1. Delete the whole number. 2. Tap **Save phone number**. 3. Re-open My details.
+- Expect: the button is enabled once the field is empty; after saving, "Phone number removed." is shown; on re-opening the field is empty with the placeholder "Not set — e.g. 012-345 6789" — not "null" and not the old number.
+
+#### STF-PRO-10 — Phone: no-op, too long, and save failure
+- [ ] Pass
+- Account: Amir
+- Pre: on My details with a saved number
+- Steps: 1. Type one digit, then delete it. 2. Paste a 33-character value and tap **Save phone number**. 3. Enter a valid number, turn on Airplane mode, tap save. 4. Turn Airplane mode off and tap save.
+- Expect: 1 → the button goes back to disabled (nothing to save). 2 → "Keep it to 32 characters or fewer." under the field; nothing is sent. 3 → "Could not save. Check your connection and try again." under the field; the typed value is kept and no "saved" line shows. 4 → saves normally. Exactly 32 characters is accepted.
+
+#### STF-PRO-11 — An employee cannot change anything but their phone (API)
+- [ ] Pass
+- Account: Amir (Swagger with his token)
+- Pre: note Amir's name, job title, role and salary on the admin hub
+- Steps: 1. `PATCH /api/employees/me` with `{"phone":"0111111111","fullName":"Hacked","jobTitle":"CEO","email":"x@lumi.com","role":"OWNER","monthlySalary":99999}`. 2. `PATCH /api/employees/{amirId}` with `{"jobTitle":"CEO"}`. 3. `PATCH /api/employees/me` with a 33-character phone. 4. `PATCH /api/employees/me` with `{"phone":"   "}`. 5. Step 1 with no token.
+- Expect: 1 → **200** and only `phone` changed — name, job title, email, role and salary in the response, in My details and on the admin hub are exactly as before, and Amir still signs in with `amir@lumi.com`. 2 → **403**. 3 → **400** "Phone number must be at most 32 characters". 4 → 200 with `phone` null (blank clears). 5 → **401**.
+
+#### STF-PRO-12 — HR's changes show up in My details
+- [ ] Pass
+- Account: Sarah, then Amir
+- Pre: Amir signed in on a second device
+- Steps: 1. Sarah changes Amir's job title (hub → Profile) and reporting manager to None (hub → Employment). 2. Amir re-opens My details (relaunch if needed). 3. Sarah restores both.
+- Expect: Job title shows the new value and Reporting manager reads "Company owner approves"; after step 3 it reads "Nadia Rahman" again. Amir's saved phone number is not affected by Sarah's saves. Note whether a relaunch was needed to see the change.
 
 ### B.11 Staff tab bar
 
@@ -1053,6 +1271,20 @@ Nadia's inbox. Screen: `app/(staff)/approvals.tsx` + `ApprovalCards`.
 - Pre: signed in
 - Steps: 1. Look through every tab and Profile. 2. (Optional, Swagger with Nadia's token) call `POST /api/admin/payroll/run`, `POST /api/employees`, `PATCH /api/admin/company-settings`.
 - Expect: no route to payroll run, staff editing, company settings, work locations or calendar admin in the UI; the API calls return **403**.
+
+#### MGR-16 — Claim card shows the receipt and opens it full size
+- [ ] Pass
+- Account: Nadia
+- Pre: Amir has a pending claim **with** a receipt (STF-CLM-15 — captured on a physical device, the iOS Simulator has no camera; or created through Swagger)
+- Steps: 1. Approvals → **Claims**. 2. Read the strip under Amir's name and amount. 3. Tap the photo. 4. Close the viewer. 5. Tap **Approve**.
+- Expect: the strip shows a 52 px thumbnail of the real receipt with "Receipt attached" and "Tap the photo to view it full size". The viewer title is the claim title and the caption is "Amir Hakim · RM <amount>"; the whole receipt is visible and readable. Closing it returns to the inbox with the card still pending — looking at a receipt never decides the claim. Approve then behaves as MGR-06.
+
+#### MGR-17 — Claim without a receipt says so
+- [ ] Pass
+- Account: Nadia
+- Pre: Amir has a pending claim **without** a receipt (STF-CLM-16)
+- Steps: 1. Approvals → **Claims**. 2. Read the strip on that card and tap it. 3. Tap **Decline** (or Approve).
+- Expect: the strip reads "No receipt attached" with a small receipt icon — no thumbnail, no grey photo box, and nothing happens on tap. **Approve** and **Decline** are both still available (a receipt is optional) and work as MGR-06.
 
 ---
 
@@ -1269,7 +1501,7 @@ the case says Owner.
 - Steps: 1. Hub → **Profile** → change only the **Job title** → **Save profile**. 2. Hub → **Employment**. 3. Repeat by saving **Compensation**, then **Statutory & bank**, then one **Leave entitlement** row, re-opening Employment after each.
 - Expect: after **every** save the reporting manager chip is still Nadia and the work location chip is still the assigned site. The employee's next request still routes to Nadia (not the owner) and their clock-in is still geofenced. *(This was a real data-loss bug — any single-section save used to clear both.)*
 
-### D.7 Hub → Employment (`employee-employment.tsx`)
+### D.7 Hub → Employment (`employee-employment.tsx`, `employee-reset-password.tsx`)
 
 #### ADM-EMP-12 — Assign reporting manager, work location and join date
 - [ ] Pass
@@ -1326,6 +1558,53 @@ the case says Owner.
 - Pre: an employee with no join date (created via Add employee)
 - Steps: 1. Open Employment and read the **Joined** field and its helper. 2. Save without touching it. 3. Re-open. 4. Try to pick a future date.
 - Expect: helper says "Not recorded yet — pick a date to prorate their first-year leave entitlement."; the field must not look like today's date has already been saved; saving untouched leaves it unrecorded; future dates are not selectable. After picking a date the helper reads "Prorates their first-year leave entitlement."
+
+**Reset password** (ADM-EMP-35 → 40). There is no email reset: an OWNER / HR_ADMIN
+sets a temporary password from the Employment screen and passes it on. Use
+**Arjun** as the target, and restore his password afterwards (reset it to
+`password`) or reset the data (0.5).
+
+#### ADM-EMP-35 — Reset password button: who sees it, and for whom
+- [ ] Pass
+- Account: Sarah, then `owner@lumi.com`
+- Pre: Staff tab
+- Steps: 1. Sarah: open Employment for Arjun Nair, for Sarah Lim (herself) and for Imran Yusof (the owner). 2. Owner: open Employment for Sarah Lim and for Imran Yusof (himself).
+- Expect: a light **Reset password** button sits under **Save employment** for Arjun (Sarah) and for Sarah (owner — together with **Transfer ownership**). It is **not** shown on your own record (your own password goes through Profile → Change password) and **not** shown to Sarah on the owner's record. The button appears only once the employee's details have loaded.
+
+#### ADM-EMP-36 — Reset an employee's password; the new one works at next login
+- [ ] Pass
+- Account: Sarah, then `arjun@lumi.com`
+- Pre: Staff → Arjun Nair → Employment; Arjun signed out
+- Steps: 1. Tap **Reset password**. 2. Read the screen. 3. **Temporary password**: `Temp-pass-01`. 4. Tap **Reset password**. 5. Dismiss the alert. 6. Arjun signs in with the old password, then with `Temp-pass-01`. 7. Arjun: Profile → **Change password**, using `Temp-pass-01` as the current password.
+- Expect: the screen slides up titled "Reset password" with the subtitle "Arjun Nair"; the field shows what is typed in **plain text** (the admin has to read it out) with the placeholder "At least 8 characters"; an amber note reads "Share this password with Arjun Nair privately — it replaces their current one straight away. Once they're signed in, they can set their own under Profile → Change password." The button reads "Resetting…", then an alert "Password reset" — "Share the temporary password with Arjun Nair so they can sign in." — and the screen closes back to Employment with role, manager, work location and join date unchanged. Step 6: the old password is rejected (AUTH-10 treatment), the temporary one signs in to staff Home. Step 7 succeeds. Sarah herself stays signed in throughout.
+
+#### ADM-EMP-37 — Temporary password validation; leaving does not reset
+- [ ] Pass
+- Account: Sarah
+- Pre: on Reset password for Arjun
+- Steps: 1. Tap **Reset password** with the field blank. 2. Enter 7 characters and tap it. 3. Enter 73 characters and tap it. 4. Type a valid password, then tap the back chevron. 5. Arjun signs in with his current password.
+- Expect: 1 and 2 → "Use at least 8 characters."; 3 → "Keep it to 72 characters or fewer."; the button never shows "Resetting…" and no alert appears. 4 → returns to Employment with nothing changed. 5 → still works. With the API stopped, a valid submit shows "Could not reset the password. Check your connection and try again." and keeps the typed value.
+
+#### ADM-EMP-38 — A reset signs the employee out on every device
+- [ ] Pass
+- Account: Sarah; `arjun@lumi.com` signed in on device B **and** device C
+- Pre: both of Arjun's devices showing data
+- Steps: 1. Sarah resets Arjun's password (ADM-EMP-36). 2. On B and C keep using the app for up to 30 minutes (or shorten the access-token lifetime as in X-SES-01). 3. On B sign in with the old password, then the temporary one.
+- Expect: **both** B and C are returned to the signed-out flow (Onboarding / Login) once their access token expires (≤ 30 min) — unlike a self-service change (AUTH-32), no device is spared. Neither can get back in with the old password; the temporary one works. No crash loop and no screen stuck on error boxes. Log how long the devices stayed usable after the reset, and whether a push still arrives on a device that has been signed out this way (compare DEV-09).
+
+#### ADM-EMP-39 — An HR admin cannot reset the owner; the owner can reset an HR admin
+- [ ] Pass
+- Account: Sarah (app + Swagger with her token), then `owner@lumi.com`
+- Pre: the owner's employee id (from `GET /api/employees`)
+- Steps: 1. Sarah: Staff → Imran Yusof → Employment — look for **Reset password**. 2. Swagger as Sarah: `POST /api/employees/{ownerId}/reset-password` with `{"newPassword":"Temp-pass-02"}`. 3. Sign in as `owner@lumi.com` with `password`. 4. Owner: Staff → Sarah Lim → Employment → **Reset password** → `Temp-pass-03`. 5. Sarah signs in with `Temp-pass-03`.
+- Expect: 1 → no button. 2 → **403** ("Only the owner can reset the owner's password"). 3 → the owner's password is unchanged and his sessions were not ended. 4 → succeeds with the "Password reset" alert. 5 → Sarah signs in with the temporary password (her old one fails). An owner who forgets their own password has **no** in-app recovery — see Known limitations.
+
+#### ADM-EMP-40 — Managers, employees and other companies cannot reset a password (API)
+- [ ] Pass
+- Account: Swagger with tokens for Nadia, Amir, `admin@nusantara.com`, Sarah
+- Pre: Amir's employee id
+- Steps: 1. `POST /api/employees/{amirId}/reset-password` with `{"newPassword":"Temp-pass-04"}` as Nadia. 2. As Amir (his own id). 3. As `admin@nusantara.com`. 4. With no token. 5. As Sarah with `{"newPassword":"short"}`. 6. Amir signs in with `password`.
+- Expect: 1 → **403**; 2 → **403**; 3 → **404** (another company); 4 → **401**; 5 → **400** ("Password must be 8 to 72 characters"); 6 → still works — none of the refused calls changed his password or signed him out. In the app, Nadia has no route to the Employment screen at all (MGR-15).
 
 ### D.8 Transfer ownership
 
@@ -1490,6 +1769,13 @@ the case says Owner.
 - Pre: clear a tab; submit one half-day request from a staff account
 - Steps: 1. Open the empty tab. 2. Open the half-day card.
 - Expect: "No <leave/claims/overtime> to review — You're all caught up."; the half-day duration chip is amber.
+
+#### ADM-APR-05 — Admin sees claim receipts (or "No receipt attached")
+- [ ] Pass
+- Account: Sarah
+- Pre: two pending claims: one **with** a receipt from an employee who does not report to Nadia (e.g. Faizal — captured on a physical device, the iOS Simulator has no camera; or created through Swagger) and one **without**
+- Steps: 1. Approve tab → **Claims**. 2. On the first card tap the receipt photo, then close it. 3. Read the strip on the second card. 4. Approve the first claim. 5. The claimant opens Claims and taps the thumbnail of the now-approved claim.
+- Expect: first card: thumbnail + "Receipt attached" / "Tap the photo to view it full size"; the viewer shows the full receipt with the caption "<employee> · RM <amount>" — HR Admin / Owner can open any receipt in their company. Second card: "No receipt attached". After approval the card leaves the queue, and the claimant can still open the receipt from their own list (it is kept after the decision).
 
 ### D.13 Payroll run (`app/admin/(tabs)/payroll.tsx`)
 
@@ -1882,8 +2168,8 @@ the case says Owner.
 - [ ] Pass
 - Account: Sarah
 - Pre: on Profile
-- Steps: 1. Tap **Company settings**, **Work locations**, **Company calendar**, **Team members** — returning each time. 2. Tap any remaining row and the header pencil.
-- Expect: the four rows open Company settings, Work locations, Company calendar and the Staff tab. Rows with no destination ("Personal information", "App settings", "Privacy & security") and a pencil that does nothing must **not be shown** — no chevron row may be a dead end.
+- Steps: 1. Tap **Company settings**, **Work locations**, **Company calendar**, **Team members**, **Change password** — returning each time. 2. Tap any remaining row and the header pencil.
+- Expect: the five rows open Company settings, Work locations, Company calendar, the Staff tab and Change password (AUTH-26). Rows with no destination ("Personal information", "App settings", "Privacy & security") and a pencil that does nothing must **not be shown** — no chevron row may be a dead end.
 
 #### ADM-PRO-03 — Log out
 - [ ] Pass
@@ -2339,7 +2625,8 @@ recompute with the table — the expected **method** is identical.
 ## G. Device-only checks (physical device, preview build)
 
 These cannot be verified in the iOS Simulator (no camera) or Expo Go (no remote
-push). Run them on at least one iPhone and one Android phone.
+push). Run them on at least one iPhone and one Android phone. The receipt-camera
+cases in B.5 (STF-CLM-10 → 15, 18, 19 step 4) need a physical device too.
 
 #### DEV-01 — Selfie capture on clock-in
 - [ ] Pass
@@ -2439,9 +2726,30 @@ push). Run them on at least one iPhone and one Android phone.
 - Steps: 1. Launch, close, relaunch.
 - Expect: the new JS loads on the second launch; the session is preserved; no native-module crash (camera, location, file export all still work).
 
+#### DEV-15 — Receipt capture with the real back camera
+- [ ] Pass
+- Account: Amir on a physical phone (the iOS Simulator has no camera) — run on one iPhone and one Android phone
+- Pre: preview build; a real paper receipt (thermal print if possible); normal indoor light
+- Steps: 1. New claim → **Add receipt photo** → take the photo holding the phone upright. 2. Submit. 3. Repeat holding the phone sideways (landscape). 4. Open both from the Claims list, and as Nadia from the Approvals card on a second device.
+- Expect: the **back** camera is used; both photos appear upright (not rotated or mirrored) in the form thumbnail, the list thumbnail and the full-screen viewer on both devices; the merchant, date and total on the receipt are readable at full size. The capture screen respects the notch / home indicator (X and shutter fully tappable).
+
+#### DEV-16 — Receipt upload size and speed
+- [ ] Pass
+- Account: staff on mobile data (not Wi-Fi), ideally the highest-resolution phone available (the iOS Simulator has no camera)
+- Pre: weak signal if possible
+- Steps: 1. Photograph a long, detailed receipt and submit the claim.
+- Expect: the claim is submitted within ~10 s; it never fails with "Photo too large (max 2 MB). Please retake."; if the photo genuinely cannot be made small enough the form shows the "too large" note (STF-CLM-19) and the claim can still go in without it. No duplicate claim after a slow submit.
+
+#### DEV-17 — Receipt camera: permission denied, then granted in Settings
+- [ ] Pass
+- Account: Amir on a physical phone (the iOS Simulator has no camera)
+- Pre: camera permission denied for Teamora
+- Steps: 1. New claim → **Add receipt photo** (expect the note, STF-CLM-18). 2. Open system Settings, allow Camera for Teamora, return to the app. 3. Open New claim again → **Add receipt photo**.
+- Expect: after enabling, the camera opens and a receipt can be attached. On Android (where the app is not restarted by the permission change) note whether the form still shows the "Camera access is off…" note until the screen is re-opened — log it if so. The clock-in selfie uses the same permission: check Clock In still shows its live preview (DEV-02).
+
 ---
 
-## H. Release smoke checklist (≈ 10 minutes)
+## H. Release smoke checklist (≈ 15 minutes)
 
 Run on the exact build / update being released, against the target backend.
 Two devices make it faster (one staff, one admin). Any failure blocks the release.
@@ -2467,6 +2775,12 @@ Two devices make it faster (one staff, one admin). Any failure blocks the releas
 - [ ] **19.** Profile → Company settings, Work locations, Company calendar each open and load *(ADM-PRO-02)*
 - [ ] **20.** `admin@nusantara.com` → Staff list shows only Nusantara people *(X-TEN-01)*
 - [ ] **21.** Physical device only: clock-in selfie appears on the Live board; a push arrives for a decided request *(DEV-01, DEV-07)*
+- [ ] **22.** Login → **Forgot password?** shows the "Ask your HR admin to reset your password…" alert *(AUTH-15)*
+- [ ] **23.** Staff Profile → **Change password**: a wrong current password shows "Current password is incorrect"; a correct change shows "Password changed", the device stays signed in, and the new password works after Log out *(AUTH-28, AUTH-27)*
+- [ ] **24.** `sarah@lumi.com` → Staff → that employee → Employment → **Reset password** → set it back to `password` → the employee signs in with it *(ADM-EMP-36)*
+- [ ] **25.** Staff Profile → **My details** shows the real record; save a phone number → "Phone number saved." and it is still there on re-open *(STF-PRO-05, STF-PRO-08)*
+- [ ] **26.** Claim submitted **without** a receipt shows the grey receipt tile, and its approval card reads "No receipt attached" *(STF-CLM-16, MGR-17)*
+- [ ] **27.** Physical device only (the iOS Simulator has no camera): New claim → **Add receipt photo** → take it → submit → the thumbnail shows in Claims, and the approver opens it full size from the claim card *(STF-CLM-15, MGR-16)*
 
 Do **not** approve or mark payroll as paid during a smoke pass on a shared
 environment — those steps are irreversible for the period (ADM-PAY-05, ADM-PAY-08).
@@ -2515,15 +2829,107 @@ release and that the UI never pretends otherwise.
 - Birthdays are derived from employee records and cannot be created as calendar events.
 
 **Claims**
-- No receipt photo / attachment upload; no claim categories or limits configuration; no claim edit / cancel.
+- A claim takes **one** receipt photo, from the camera only (no gallery pick, no PDF, no multiple pages), and only at submit time — a receipt cannot be added, replaced or removed afterwards. Photos are capped at 2 MB.
+- Receipt capture needs a physical device (no camera in the iOS Simulator).
+- No claim categories or limits configuration; no claim edit / cancel.
 
 **Notifications**
 - Remote push needs a development / EAS build on a physical device (not Expo Go, not simulators).
 - No per-notification read state or deep link to the related request — tapping a push opens the Notifications list.
 
 **Account & app**
-- No forgot-password / change-password flow; no employee self-service profile editing; no employee deactivation / off-boarding screen; work email cannot be changed.
-- No password strength rule (any non-empty password is accepted).
+- **No email / self-service password reset** — "Forgot password?" only tells the user to ask their HR admin, who sets a temporary password by hand (ADM-EMP-36). The employee is not forced to change the temporary password at first sign-in.
+- **An owner who forgets their password cannot be recovered in the app** — an HR admin cannot reset the owner, and the owner's own record has no Reset password button.
+- After a password change or reset, other devices stay usable until their access token expires (up to 30 minutes) — the sign-out is not instant.
+- Employee self-service editing is **phone number only** (My details); everything else is changed by HR. The saved phone number is not shown on any admin screen. The admin app has no "My details" screen.
+- No employee deactivation / off-boarding screen; work email cannot be changed.
+- The only password rule is length (8–72 characters, enforced on Change password and Reset password) — no complexity rule, no reuse history, no lockout after repeated wrong attempts. Check whether Register and Add employee enforce the same minimum in the build under test and log it if they do not.
 - Documents & contracts, App settings and Privacy & security have no backing feature.
 - English only (no i18n / language switcher); light mode only.
 - Admins (OWNER / HR_ADMIN) have no self-service screens in the admin app (own clock-in, leave, claims, payslip, notifications).
+
+---
+
+## I. Round 2 changes (added 2 Oct 2026)
+
+Cases for behaviour that changed after the first QA pass. Same format and accounts as above.
+
+#### R2-01 — Staff never see an unapproved payslip
+- **Steps:** As HR admin run payroll for the current month (leave it as Draft). Sign in as that month's employee → Payroll tab.
+- **Expected:** The draft month is not listed. With no approved payslips the screen shows "No payslips yet". After the admin approves, it appears with "Approved · pay date …"; after Mark as paid it reads "Paid …".
+- [ ] Pass
+
+#### R2-02 — Payslip bank line is real or absent
+- **Steps:** Admin sets Bank name + account number on an employee (Statutory & bank), approves a run. Open that employee's payslip and its PDF. Repeat for an employee with no bank details.
+- **Expected:** "Bank ••last4" for the first; no bank text at all (and never "null" or "Maybank ••4821") for the second.
+- [ ] Pass
+
+#### R2-03 — Switching accounts shows no stale data
+- **Steps:** Sign in as amir@lumi.com, open Home, Leave and Claims. Log out. Sign in as nadia@lumi.com.
+- **Expected:** No flash of Amir's numbers, name or requests anywhere.
+- [ ] Pass
+
+#### R2-04 — Launching offline keeps you signed in
+- **Steps:** Sign in, force-quit, turn on Airplane Mode, reopen.
+- **Expected:** "Can't reach Teamora — You're still signed in" with Try again. Turn Airplane Mode off → Try again → lands in the app without logging in again.
+- [ ] Pass
+
+#### R2-05 — Approve / Decline failures are shown
+- **Steps:** Open a pending request on two devices as two approvers. Approve on one, then tap Approve on the other.
+- **Expected:** The second device shows an alert with the server's reason; the card does not silently disappear or stay stuck.
+- [ ] Pass
+
+#### R2-06 — Payroll action failures are shown
+- **Steps:** As a MANAGER-level token (or with the server stopped) trigger Run / Approve / Mark as paid.
+- **Expected:** An alert explains the failure; the status chip does not change.
+- [ ] Pass
+
+#### R2-07 — Leave beyond the balance is blocked (tracked types)
+- **Steps:** As staff, apply for more Annual Leave days than "available". Then apply for Unpaid Leave of the same length.
+- **Expected:** Annual: the form shows the available balance, Submit is blocked or the server replies "Not enough Annual Leave balance — you have N day(s) available." Unpaid: accepted.
+- [ ] Pass
+
+#### R2-08 — Overlapping leave is blocked
+- **Steps:** With a pending or approved full-day request on a date, apply again covering that date. Then try AM half-day + PM half-day on one new date.
+- **Expected:** First: "You already have a leave request covering these dates." Second: both half-days are accepted.
+- [ ] Pass
+
+#### R2-09 — Work start time and late grace drive "Late"
+- **Steps:** Admin → Company settings → set Work start time 08:30, Late after 10 → Save defaults. Clock in as staff at 08:39, another at 08:41.
+- **Expected:** 08:39 is Present, 08:41 is Late. Staff Home reads "Work starts 8:30 AM".
+- [ ] Pass
+
+#### R2-10 — Live Attendance is real
+- **Steps:** Admin → Live Attendance. Tap each filter chip.
+- **Expected:** No map, no pins, no site name unless the person clocked in at an assigned site. Counts match the filtered list; each empty filter shows its own empty state.
+- [ ] Pass
+
+#### R2-11 — Month and payslip steppers
+- **Steps:** Staff Attendance → previous month and back. Staff Payroll → step between payslips.
+- **Expected:** Data changes with the month; "next" is disabled at the current month / newest payslip.
+- [ ] Pass
+
+#### R2-12 — Admin notifications
+- **Steps:** As staff submit a claim. As HR admin open the dashboard.
+- **Expected:** Bell shows an unread dot; tapping opens Notifications with the new item; Mark all read clears the dot.
+- [ ] Pass
+
+#### R2-13 — Validation
+- **Steps:** Try: blank company name; all working days off (company settings and an employee's Compensation); a 7-character password on Register, Add employee, Change password, Reset password; a duplicate Staff ID.
+- **Expected:** Each is rejected with a readable message next to the field; nothing is saved.
+- [ ] Pass
+
+#### R2-14 — Admin edits Staff ID and phone
+- **Steps:** Admin → employee → Profile → change Staff ID and Phone → Save. Clear the phone → Save.
+- **Expected:** Values persist; the employee sees them in My details; a cleared phone shows "Not set".
+- [ ] Pass
+
+#### R2-15 — Join-date change re-prorates leave
+- **Steps:** Add an employee with today's join date (prorated Annual Leave). Change the join date to 1 January.
+- **Expected:** Entitlement rises to the full-year figure. If the admin had overridden the entitlement by hand, it is left untouched.
+- [ ] Pass
+
+#### R2-16 — Reset password asks first and cannot target yourself
+- **Steps:** Admin → employee → Employment → Reset password → enter a password → Reset.
+- **Expected:** A confirmation ("Reset …'s password?") appears before anything changes. Your own record shows no Reset button.
+- [ ] Pass

@@ -23,12 +23,14 @@ public final class EmployeeDtos {
     public record CreateEmployeeRequest(
             @NotBlank String fullName,
             @Email @NotBlank String email,
-            @NotBlank String password,
+            @NotBlank(message = "Enter a password")
+            @Size(min = 8, max = 72, message = "Password must be 8 to 72 characters") String password,
             @NotNull Role role,
             String jobTitle,
             String department,
-            String staffId,
-            String phone,
+            /** Human-friendly id, unique within the company (blank = none). */
+            @Size(max = 32, message = "Staff ID must be at most 32 characters") String staffId,
+            @Size(max = 32, message = "Phone number must be at most 32 characters") String phone,
             /** First day of employment — drives first-year leave proration. */
             java.time.LocalDate joinDate,
             UUID reportingManagerId,
@@ -38,7 +40,8 @@ public final class EmployeeDtos {
             Boolean spouseWorking,
             @PositiveOrZero Integer numChildren,
             PayBasis payBasis,
-            @Min(0) @Max(127) Integer workingDays,
+            @Min(value = 1, message = "Pick at least one working day")
+            @Max(127) Integer workingDays,
             @PositiveOrZero BigDecimal hoursPerDay,
             // Statutory & bank identity (all optional)
             String nric,
@@ -56,8 +59,10 @@ public final class EmployeeDtos {
             String fullName,
             String jobTitle,
             String department,
-            String phone,
-            String staffId,
+            /** Blank clears it. */
+            @Size(max = 32, message = "Phone number must be at most 32 characters") String phone,
+            /** Unique within the company; blank clears it. */
+            @Size(max = 32, message = "Staff ID must be at most 32 characters") String staffId,
             /** First day of employment — drives first-year leave proration. */
             java.time.LocalDate joinDate,
             Role role,
@@ -80,7 +85,8 @@ public final class EmployeeDtos {
             Boolean spouseWorking,
             @PositiveOrZero Integer numChildren,
             PayBasis payBasis,
-            @Min(0) @Max(127) Integer workingDays,
+            @Min(value = 1, message = "Pick at least one working day")
+            @Max(127) Integer workingDays,
             @PositiveOrZero BigDecimal hoursPerDay,
             // Statutory & bank identity (all optional)
             String nric,

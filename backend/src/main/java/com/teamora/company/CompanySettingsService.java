@@ -49,6 +49,12 @@ public class CompanySettingsService {
         if (req.leaveYearStartMonth() != null) {
             s.setLeaveYearStartMonth(req.leaveYearStartMonth());
         }
+        if (req.workStartTime() != null) {
+            s.setWorkStartTime(java.time.LocalTime.parse(req.workStartTime()));
+        }
+        if (req.lateGraceMinutes() != null) {
+            s.setLateGraceMinutes(req.lateGraceMinutes());
+        }
         return s;
     }
 }

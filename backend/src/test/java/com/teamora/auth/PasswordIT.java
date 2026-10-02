@@ -224,4 +224,14 @@ class PasswordIT extends AbstractIntegrationTest {
         reset(ownerB, empId, "temp-pass-123").andExpect(status().isNotFound());
         login(empEmail, "password");
     }
+
+    @Test
+    void resetPassword_onYourself_400() throws Exception {
+        JsonNode reg = register("pw-self");
+        String owner = reg.get("accessToken").asText();
+        String ownerId = reg.get("employee").get("id").asText();
+
+        // Your own password goes through change-password (which needs the current one).
+        reset(owner, ownerId, "temp-pass-123").andExpect(status().isBadRequest());
+    }
 }

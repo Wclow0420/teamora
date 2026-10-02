@@ -1,6 +1,7 @@
 package com.teamora.company;
 
 import com.teamora.common.BaseEntity;
+import com.teamora.common.HhMmConverter;
 import com.teamora.common.WorkWeek;
 import com.teamora.employee.PayBasis;
 import com.teamora.leave.LeaveYear;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.UUID;
 
 /**
@@ -51,6 +53,23 @@ public class CompanySettings extends BaseEntity {
     @Column(name = "leave_year_start_month", nullable = false)
     private int leaveYearStartMonth;
 
+    /** When the working day starts (company-local wall-clock time). */
+    @Convert(converter = HhMmConverter.class)
+    @Column(name = "work_start_time", nullable = false, length = 5)
+    private LocalTime workStartTime = DEFAULT_WORK_START_TIME;
+
+    /** Minutes after {@link #workStartTime} before a clock-in counts as LATE (0–120). */
+    @Column(name = "late_grace_minutes", nullable = false)
+    private int lateGraceMinutes = DEFAULT_LATE_GRACE_MINUTES;
+
+    public static final LocalTime DEFAULT_WORK_START_TIME = LocalTime.of(9, 0);
+    public static final int DEFAULT_LATE_GRACE_MINUTES = 5;
+
+    /** Work start time, never null. */
+    public LocalTime workStartTimeOrDefault() {
+        return workStartTime == null ? DEFAULT_WORK_START_TIME : workStartTime;
+    }
+
     /** A settings row seeded with the standard Malaysian defaults (Mon–Fri, 8h, monthly). */
     public static CompanySettings defaultsFor(Company company) {
         CompanySettings s = new CompanySettings();
@@ -59,6 +78,8 @@ public class CompanySettings extends BaseEntity {
         s.setDefaultWorkingDays((short) WorkWeek.MON_TO_FRI);
         s.setDefaultHoursPerDay(new BigDecimal("8.00"));
         s.setLeaveYearStartMonth(LeaveYear.DEFAULT_START_MONTH);
+        s.setWorkStartTime(DEFAULT_WORK_START_TIME);
+        s.setLateGraceMinutes(DEFAULT_LATE_GRACE_MINUTES);
         return s;
     }
 }

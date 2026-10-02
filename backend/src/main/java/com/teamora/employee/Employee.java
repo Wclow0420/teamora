@@ -44,10 +44,14 @@ public class Employee extends TenantEntity {
 
     private String department;
 
+    /**
+     * Legacy free-text column — no longer written or exposed. The employee's site is
+     * {@link #workLocation}; the API's {@code location} is derived from that.
+     */
     private String location;
 
-    /** Human-friendly id shown in the app, e.g. "EMP-042". */
-    @Column(name = "staff_id", unique = true)
+    /** Human-friendly id shown in the app, e.g. "EMP-042". Unique within the company (V18). */
+    @Column(name = "staff_id")
     private String staffId;
 
     private String phone;

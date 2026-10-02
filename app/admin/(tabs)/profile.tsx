@@ -88,7 +88,7 @@ export default function AdminProfile() {
       </Card>
 
       {/* log out */}
-      <Pressable onPress={onLogout} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 }}>
+      <Pressable onPress={onLogout} accessibilityRole="button" accessibilityLabel="Log out" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 }}>
         <Icon name="logout" size={18} color={palette.danger} />
         <Text style={[font(700), { fontSize: 13.5, color: palette.danger }]}>Log out</Text>
       </Pressable>

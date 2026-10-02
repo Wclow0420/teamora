@@ -20,7 +20,8 @@ public final class AuthDtos {
             @NotBlank String companyName,
             @NotBlank String fullName,
             @Email @NotBlank String email,
-            @NotBlank String password
+            @NotBlank(message = "Enter a password")
+            @Size(min = 8, max = 72, message = "Password must be 8 to 72 characters") String password
     ) {}
 
     public record RefreshRequest(@NotBlank String refreshToken) {}

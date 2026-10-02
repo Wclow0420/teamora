@@ -1,30 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CollapsingHeaderScreen } from '@/components/layout/CollapsingHeaderScreen';
-import { BarChart, Button, Card, Chip, EmptyState, Icon, StatTile } from '@/components/ui';
+import { BarChart, Button, Card, Chip, EmptyState, MonthStepper, StatTile } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { useAttendanceHistory } from '@/api/queries';
 import { statusAccent } from '@/api/accents';
+import { currentPeriod, periodLabel, shiftPeriod } from '@/lib/period';
 import { palette, font, tint } from '@/theme';
 
-/** "2026-06" → "June 2026"; falls back to the raw value if it can't parse. */
-function formatMonth(month: string | undefined): string {
-  if (!month) return '—';
-  const [y, m] = month.split('-').map(Number);
-  if (!y || !m) return month;
-  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+/** ISO "2026-06-09" → "9" for the day column; anything else is shown as sent. */
+function dayOfMonth(date: string): string {
+  const m = /^\d{4}-\d{2}-(\d{2})$/.exec(date);
+  return m ? String(Number(m[1])) : date;
 }
 
 export default function Attendance() {
   const router = useRouter();
-  const q = useAttendanceHistory();
+  const thisMonth = currentPeriod();
+  const [month, setMonth] = useState(thisMonth);
+  const isCurrent = month === thisMonth;
+  const q = useAttendanceHistory(month);
 
   return (
     <CollapsingHeaderScreen
       bottomInset={70}
       title="Attendance"
-      accessory={<Chip label={formatMonth(q.data?.month)} background={palette.surface} color={palette.soft} leading={<Icon name="chevD" size={14} color={palette.soft} />} />}
+      accessory={
+        <MonthStepper
+          label={periodLabel(month, true)}
+          onPrev={() => setMonth((m) => shiftPeriod(m, -1))}
+          onNext={isCurrent ? undefined : () => setMonth((m) => shiftPeriod(m, 1))}
+        />
+      }
     >
       <AsyncBoundary loading={q.isLoading} error={q.error} onRetry={q.refetch}>
         {q.data && (
@@ -37,7 +45,8 @@ export default function Attendance() {
               <StatTile value={q.data.otHoursLabel} label="OT" color={palette.violet} />
             </View>
 
-            {/* week chart */}
+            {/* week chart — always the current week, so it only belongs on the current month */}
+            {isCurrent && (
             <Card style={{ marginTop: 14 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>This week</Text>
@@ -49,17 +58,22 @@ export default function Attendance() {
                 labels={['M', 'T', 'W', 'T', 'F', 'S', 'S']}
                 highlight={q.data.weeklyHours.map((_, i) => i).filter((i) => q.data!.weeklyHours[i] !== 0)}
                 empty={q.data.weeklyHours.map((_, i) => i).filter((i) => q.data!.weeklyHours[i] === 0)}
-                barColor="#EC6A4D"
+                barColor={palette.coral}
               />
             </Card>
+            )}
 
             {/* day list */}
             {q.data.days.length === 0 ? (
               <View style={{ marginTop: 14 }}>
                 <EmptyState
                   icon="clock"
-                  title="No attendance yet"
-                  subtitle="Your clock-in history for this month will appear here."
+                  title={isCurrent ? 'No attendance yet' : 'No attendance recorded'}
+                  subtitle={
+                    isCurrent
+                      ? 'Your clock-in history for this month will appear here.'
+                      : `There are no clock-ins on record for ${periodLabel(month)}.`
+                  }
                   tone={{ color: palette.sage, bg: tint.sage }}
                 />
               </View>
@@ -80,7 +94,7 @@ export default function Attendance() {
                     }}
                   >
                     <View style={{ width: 42, alignItems: 'center' }}>
-                      <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>{d.date}</Text>
+                      <Text style={[font(700), { fontSize: 13, color: palette.ink, fontVariant: ['tabular-nums'] }]}>{dayOfMonth(d.date)}</Text>
                       <Text style={[font(600), { fontSize: 10, color: palette.faint, marginTop: 4 }]}>{d.weekday}</Text>
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
