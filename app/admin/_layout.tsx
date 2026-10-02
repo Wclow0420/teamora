@@ -22,6 +22,8 @@ export default function AdminLayout() {
       <Stack.Screen name="employee-compensation" />
       <Stack.Screen name="employee-statutory" />
       <Stack.Screen name="employee-leave" />
+      <Stack.Screen name="employee-reset-password" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="change-password" />
       <Stack.Screen name="company-settings" />
       <Stack.Screen name="payroll-export" />
       <Stack.Screen name="leave-type-edit" options={{ animation: 'slide_from_bottom' }} />

@@ -1,11 +1,13 @@
 package com.teamora.employee;
 
+import com.teamora.auth.RefreshTokenRepository;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.company.Company;
 import com.teamora.employee.dto.EmployeeDtos.ChangeRoleRequest;
 import com.teamora.employee.dto.EmployeeDtos.CreateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
+import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
 import com.teamora.location.WorkLocation;
@@ -27,7 +29,10 @@ import java.util.UUID;
 public class EmployeeService {
 
     private final EmployeeRepository employees;
+    private static final int MAX_PHONE_LENGTH = 32;
+
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokens;
     private final CompensationService compensationService;
     private final WorkLocationRepository workLocations;
 
@@ -201,6 +206,37 @@ public class EmployeeService {
         target.setRole(Role.OWNER);
         employees.saveAndFlush(target);    // now only one OWNER row for this company
         return EmployeeResponse.from(target);
+    }
+
+    /** Self-service: the caller updates their own phone (the only self-editable field). */
+    @Transactional
+    public EmployeeResponse updateOwnPhone(Employee caller, SelfUpdateRequest req) {
+        Employee e = employees.findByIdAndCompanyIdWithManager(caller.getId(), caller.getCompany().getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Employee", caller.getId()));
+        if (req != null && req.phone() != null) {
+            String phone = trimToNull(req.phone());
+            if (phone != null && phone.length() > MAX_PHONE_LENGTH) {
+                throw new BadRequestException("Phone number must be at most " + MAX_PHONE_LENGTH + " characters");
+            }
+            e.setPhone(phone);
+        }
+        return toDetail(e);
+    }
+
+    /**
+     * Admin (OWNER/HR_ADMIN) sets a new password for an employee in their company
+     * and signs that employee out everywhere (all refresh tokens revoked). Only
+     * the OWNER may reset the OWNER's password.
+     */
+    @Transactional
+    public void resetPassword(Employee caller, UUID id, String newPassword) {
+        Employee e = employees.findByIdAndCompanyId(id, caller.getCompany().getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
+        if (e.getRole() == Role.OWNER && caller.getRole() != Role.OWNER) {
+            throw new AccessDeniedException("Only the owner can reset the owner's password");
+        }
+        e.setPasswordHash(passwordEncoder.encode(newPassword));
+        refreshTokens.revokeAllForEmployee(e.getId(), "");
     }
 
     // ---- helpers ----

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { attendanceApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveBalanceAdminApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
-import type { ApplyLeaveBody, AssignShiftBody, ClockInBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateWorkLocationBody } from './types';
+import { attendanceApi, authApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveBalanceAdminApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
+import { getRefreshToken } from './tokenStore';
+import type { ApplyLeaveBody, AssignShiftBody, ChangePasswordBody, ClockInBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody } from './types';
 
 /** Centralised query keys. */
 export const qk = {
@@ -32,6 +33,37 @@ export const qk = {
 
 // ---- Profile ----
 export const useMe = () => useQuery({ queryKey: qk.me, queryFn: employeeApi.me });
+
+/** Self-service profile edit (phone only). Refreshes `me` so every screen sees it. */
+export function useUpdateMyDetails() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateMyDetailsBody) => employeeApi.updateMe(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.me }),
+  });
+}
+
+// ---- Passwords ----
+/**
+ * Change my own password. The server verifies the current one (400 if wrong).
+ *
+ * A password change revokes the account's refresh tokens (signing out other
+ * devices). We pass this device's own refresh token so the server spares that
+ * one session — the user stays signed in here.
+ */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: Pick<ChangePasswordBody, 'currentPassword' | 'newPassword'>) =>
+      authApi.changePassword({ ...body, refreshToken: getRefreshToken() ?? undefined }),
+  });
+}
+/** OWNER/HR_ADMIN: set a temporary password for a team member. */
+export function useResetEmployeePassword() {
+  return useMutation({
+    mutationFn: ({ id, newPassword }: { id: string; newPassword: string }) =>
+      employeeApi.resetPassword(id, { newPassword }),
+  });
+}
 
 // ---- Attendance ----
 export const useTodayAttendance = () => useQuery({ queryKey: qk.today, queryFn: attendanceApi.today });

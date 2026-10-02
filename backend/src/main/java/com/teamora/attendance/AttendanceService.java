@@ -6,6 +6,7 @@ import com.teamora.attendance.dto.LiveAttendanceResponse;
 import com.teamora.attendance.dto.LiveStaffRow;
 import com.teamora.attendance.dto.TodayStatusResponse;
 import com.teamora.common.GeoUtil;
+import com.teamora.common.PhotoCodec;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.employee.Employee;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Base64;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,10 +39,6 @@ public class AttendanceService {
     private static final ZoneId KL = ZoneId.of("Asia/Kuala_Lumpur");
     private static final LocalTime LATE_AFTER = LocalTime.of(9, 5);
     private static final String DEFAULT_LOCATION = "Bangsar South HQ";
-
-    /** Cap on the decoded selfie size (~2 MB) — clients downscale before sending. */
-    private static final int MAX_PHOTO_BYTES = 2 * 1024 * 1024;
-    private static final String DEFAULT_PHOTO_TYPE = "image/jpeg";
 
     private final AttendanceRepository attendance;
     private final EmployeeRepository employees;
@@ -98,48 +94,13 @@ public class AttendanceService {
 
         // Optional selfie proof — non-blocking: absent → clock-in proceeds unchanged.
         if (photoBase64 != null && !photoBase64.isBlank()) {
-            DecodedPhoto photo = decodePhoto(photoBase64);
+            PhotoCodec.Photo photo = PhotoCodec.decode(photoBase64);
             record.setClockInPhoto(photo.bytes());
             record.setClockInPhotoType(photo.contentType());
         }
 
         return TodayStatusResponse.from(attendance.save(record));
     }
-
-    /** Bare base64 or a {@code data:image/...;base64,...} data URL → decoded bytes + content-type. */
-    private DecodedPhoto decodePhoto(String raw) {
-        String data = raw.trim();
-        String contentType = DEFAULT_PHOTO_TYPE;
-        if (data.startsWith("data:")) {
-            int comma = data.indexOf(',');
-            if (comma < 0) {
-                throw new BadRequestException("Invalid photo data URL");
-            }
-            String header = data.substring(5, comma); // e.g. "image/jpeg;base64"
-            int semi = header.indexOf(';');
-            String mime = (semi >= 0 ? header.substring(0, semi) : header).trim();
-            if (mime.startsWith("image/")) {
-                contentType = mime;
-            }
-            data = data.substring(comma + 1);
-        }
-        data = data.replaceAll("\\s", "");
-        byte[] bytes;
-        try {
-            bytes = Base64.getDecoder().decode(data);
-        } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Invalid photo encoding");
-        }
-        if (bytes.length == 0) {
-            throw new BadRequestException("Photo is empty");
-        }
-        if (bytes.length > MAX_PHOTO_BYTES) {
-            throw new BadRequestException("Photo too large (max 2 MB). Please retake.");
-        }
-        return new DecodedPhoto(bytes, contentType);
-    }
-
-    private record DecodedPhoto(byte[] bytes, String contentType) {}
 
     /** The employee's assigned work location, only if it exists and is active. */
     private WorkLocation assignedActiveSite(Employee current) {
@@ -215,8 +176,7 @@ public class AttendanceService {
         if (bytes == null || bytes.length == 0) {
             throw ResourceNotFoundException.of("Attendance photo", recordId);
         }
-        String type = record.getClockInPhotoType();
-        return new PhotoData(bytes, type != null && !type.isBlank() ? type : DEFAULT_PHOTO_TYPE);
+        return new PhotoData(bytes, PhotoCodec.typeOrDefault(record.getClockInPhotoType()));
     }
 
     /** Raw selfie bytes + content-type for the photo endpoint. */

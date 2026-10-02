@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -96,4 +97,13 @@ public final class EmployeeDtos {
             return new ManagerOption(e.getId(), e.getFullName(), e.getRole(), e.getJobTitle());
         }
     }
+
+    /** Self-service profile update — phone is the ONLY self-editable field. Blank clears it. */
+    public record SelfUpdateRequest(String phone) {}
+
+    /** Admin sets a new (temporary) password for an employee. */
+    public record ResetPasswordRequest(
+            @NotBlank(message = "Enter a new password")
+            @Size(min = 8, max = 72, message = "Password must be 8 to 72 characters") String newPassword
+    ) {}
 }

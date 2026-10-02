@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, TextInput, Pressable, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -108,7 +108,20 @@ export default function Login() {
         <Field icon="mail" placeholder="Work email" value={email} onChangeText={setEmail} keyboardType="email-address" />
         <Field icon="lock" placeholder="Password" secure value={password} onChangeText={setPassword} />
         {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
-        <Text style={[font(600), { fontSize: 12.5, color: palette.coral, alignSelf: 'flex-end', marginTop: 2 }]}>Forgot password?</Text>
+        {/* No email infrastructure exists, so be honest: HR resets it. */}
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          onPress={() =>
+            Alert.alert(
+              'Forgot your password?',
+              'Ask your HR admin to reset your password. They can set a new one from your employee page.',
+            )
+          }
+          style={{ alignSelf: 'flex-end', marginTop: 2 }}
+        >
+          <Text style={[font(600), { fontSize: 12.5, color: palette.coral }]}>Forgot password?</Text>
+        </Pressable>
       </View>
 
       <View style={{ marginTop: 20 }}>

@@ -89,6 +89,26 @@ public class AuthService {
         refreshTokens.findByToken(refreshToken).ifPresent(t -> t.setRevoked(true));
     }
 
+    /**
+     * Change the caller's own password after verifying the current one. Revokes
+     * the caller's refresh tokens so other devices are signed out once their
+     * access token lapses; {@code keepRefreshToken} (the calling device's own
+     * token, optional) is spared so that device stays signed in.
+     */
+    @Transactional
+    public void changePassword(UUID employeeId, String currentPassword, String newPassword, String keepRefreshToken) {
+        Employee employee = employees.findById(employeeId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Employee", employeeId));
+        if (!passwordEncoder.matches(currentPassword, employee.getPasswordHash())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, employee.getPasswordHash())) {
+            throw new BadRequestException("New password must be different from your current password");
+        }
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        refreshTokens.revokeAllForEmployee(employeeId, keepRefreshToken == null ? "" : keepRefreshToken);
+    }
+
     private AuthResponse issue(Employee employee) {
         String accessToken = jwtService.generateAccessToken(employee);
         RefreshToken refresh = RefreshToken.builder()

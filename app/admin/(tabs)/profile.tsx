@@ -29,6 +29,7 @@ export default function AdminProfile() {
     { icon: 'pin', label: 'Work locations', meta: '', color: palette.violet, bg: tint.violet, href: '/admin/work-locations' },
     { icon: 'calendar', label: 'Company calendar', meta: '', color: palette.amber, bg: tint.amber, href: '/admin/calendar-events' },
     { icon: 'users', label: 'Team members', meta: '', color: palette.sage, bg: tint.sage, href: '/admin/staff' },
+    { icon: 'lock', label: 'Change password', meta: '', color: palette.soft, bg: tint.neutral, href: '/admin/change-password' },
   ];
 
   const onLogout = () => {

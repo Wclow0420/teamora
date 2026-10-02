@@ -19,6 +19,9 @@ export default function StaffLayout() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="approvals" />
       <Stack.Screen name="overtime-submit" options={{ animation: 'slide_from_bottom' }} />
+      {/* account: self-service details + password */}
+      <Stack.Screen name="my-details" />
+      <Stack.Screen name="change-password" />
     </Stack>
   );
 }

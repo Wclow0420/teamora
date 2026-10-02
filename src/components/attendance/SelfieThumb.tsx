@@ -1,8 +1,8 @@
 import React from 'react';
-import { Image, Pressable, StyleProp, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, ViewStyle } from 'react-native';
 import { Avatar } from '@/components/ui';
 import { attendanceApi } from '@/api/endpoints';
-import { getAccessToken } from '@/api/tokenStore';
+import { AuthedImage } from '@/components/media/AuthedImage';
 import { palette } from '@/theme';
 
 type Props = {
@@ -27,24 +27,18 @@ type Props = {
  * load — so the row is always resilient.
  */
 export function SelfieThumb({ recordId, hasPhoto, initial, tint, size = 38, onPress, style }: Props) {
-  const [failed, setFailed] = React.useState(false);
-  const token = getAccessToken();
+  const avatar = <Avatar initial={initial} size={size} tint={tint} />;
 
-  const showPhoto = !!hasPhoto && !!recordId && !!token && !failed;
-
-  if (!showPhoto) {
+  if (!hasPhoto || !recordId) {
     return <Avatar initial={initial} size={size} tint={tint} style={style} />;
   }
 
   const corner = Math.round(size * 0.34);
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={style}>
-      <Image
-        source={{
-          uri: attendanceApi.photoUrl(recordId),
-          headers: { Authorization: `Bearer ${token}` },
-        }}
-        onError={() => setFailed(true)}
+      <AuthedImage
+        uri={attendanceApi.photoUrl(recordId)}
+        fallback={avatar}
         style={{
           width: size,
           height: size,

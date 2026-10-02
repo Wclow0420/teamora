@@ -4,6 +4,7 @@ import {
   ApplyLeaveBody,
   AttendanceSummary,
   AuthResponse,
+  ChangePasswordBody,
   ChangeRoleBody,
   Claim,
   ClaimSummary,
@@ -40,6 +41,7 @@ import {
   PendingClaim,
   PendingLeave,
   RegisterBody,
+  ResetPasswordBody,
   SubmitClaimBody,
   TodayStatus,
   UpdateCompanyBody,
@@ -47,6 +49,7 @@ import {
   UpdateCompanySettingsBody,
   UpdateEmployeeBody,
   UpdateLeaveTypeBody,
+  UpdateMyDetailsBody,
   UpdateWorkLocationBody,
   WorkLocation,
 } from './types';
@@ -57,10 +60,13 @@ export const authApi = {
   refresh: (refreshToken: string) => api.post<AuthResponse>('/api/auth/refresh', { refreshToken }, false),
   logout: (refreshToken: string) => api.post<void>('/api/auth/logout', { refreshToken }),
   me: () => api.get<EmployeeResponse>('/api/auth/me'),
+  changePassword: (body: ChangePasswordBody) => api.post<void>('/api/auth/change-password', body),
 };
 
 export const employeeApi = {
   me: () => api.get<EmployeeResponse>('/api/employees/me'),
+  /** Self-service edit — only `phone` is editable by the employee themselves. */
+  updateMe: (body: UpdateMyDetailsBody) => api.patch<EmployeeResponse>('/api/employees/me', body),
   list: (dept?: string, q?: string) => {
     const params = new URLSearchParams();
     if (dept) params.set('dept', dept);
@@ -74,6 +80,9 @@ export const employeeApi = {
   update: (id: string, body: UpdateEmployeeBody) => api.patch<EmployeeResponse>(`/api/employees/${id}`, body),
   managers: () => api.get<ManagerOption[]>('/api/employees/managers'),
   transferOwnership: (id: string) => api.post<EmployeeResponse>(`/api/employees/${id}/transfer-ownership`),
+  /** OWNER/HR_ADMIN sets a temporary password for a team member. */
+  resetPassword: (id: string, body: ResetPasswordBody) =>
+    api.post<void>(`/api/employees/${id}/reset-password`, body),
 };
 
 export const companyApi = {
@@ -149,6 +158,12 @@ export const claimApi = {
   pending: () => api.get<PendingClaim[]>('/api/admin/claims?status=PENDING'),
   approve: (id: string) => api.post<void>(`/api/admin/claims/${id}/approve`),
   reject: (id: string) => api.post<void>(`/api/admin/claims/${id}/reject`),
+  /**
+   * Absolute URL for a claim's receipt photo. Auth-guarded (owner or an approver
+   * in the same company), so callers attach the Bearer token themselves — see
+   * `AuthedImage`.
+   */
+  receiptUrl: (claimId: string) => `${API_BASE_URL}/api/claims/${claimId}/receipt`,
 };
 
 export const overtimeApi = {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Avatar, Button, Card, Chip, Icon, type IconName } from '@/components/ui';
+import { ReceiptThumb } from '@/components/claims/ReceiptThumb';
 import { accentFromKey } from '@/api/accents';
 import type { PendingClaim, PendingLeave, PendingOvertime } from '@/api/types';
 import { palette, font, radius, tint } from '@/theme';
@@ -73,7 +74,30 @@ export function ClaimApprovalCard({ item, pending, onApprove, onReject }: { item
           <Text style={[font(700), { fontSize: 14, color: palette.ink }]} numberOfLines={1}>{item.employeeName}</Text>
           <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 5 }]} numberOfLines={1}>{item.title} · {item.claimDateLabel}</Text>
         </View>
-        <Text style={[font(800), { fontSize: 15, color: palette.ink }]}>RM {item.amountLabel}</Text>
+        <Text style={[font(800), { fontSize: 15, color: palette.ink, fontVariant: ['tabular-nums'] }]}>RM {item.amountLabel}</Text>
+      </View>
+      {/* the receipt, so the approver can check it before deciding */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 13, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 13, backgroundColor: palette.bg }}>
+        {item.hasReceipt ? (
+          <>
+            <ReceiptThumb
+              claimId={item.id}
+              hasReceipt
+              size={52}
+              title={item.title}
+              caption={`${item.employeeName} · RM ${item.amountLabel}`}
+            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[font(700), { fontSize: 12.5, lineHeight: 17, color: palette.ink }]}>Receipt attached</Text>
+              <Text style={[font(500), { fontSize: 11.5, lineHeight: 16, color: palette.faint, marginTop: 2 }]}>Tap the photo to view it full size</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Icon name="receipt" size={16} color={palette.faint} />
+            <Text style={[font(600), { flex: 1, fontSize: 12.5, lineHeight: 17, color: palette.soft }]}>No receipt attached</Text>
+          </>
+        )}
       </View>
       <DecideRow pending={pending} onApprove={onApprove} onReject={onReject} />
     </Card>

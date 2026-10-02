@@ -1,6 +1,7 @@
 package com.teamora.auth;
 
 import com.teamora.auth.dto.AuthDtos.AuthResponse;
+import com.teamora.auth.dto.AuthDtos.ChangePasswordRequest;
 import com.teamora.auth.dto.AuthDtos.LoginRequest;
 import com.teamora.auth.dto.AuthDtos.LogoutRequest;
 import com.teamora.auth.dto.AuthDtos.RefreshRequest;
@@ -39,6 +40,14 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest req) {
         authService.logout(req.refreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Change the signed-in employee's own password (must know the current one). */
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest req) {
+        authService.changePassword(currentEmployee.require().getId(),
+                req.currentPassword(), req.newPassword(), req.refreshToken());
         return ResponseEntity.noContent().build();
     }
 

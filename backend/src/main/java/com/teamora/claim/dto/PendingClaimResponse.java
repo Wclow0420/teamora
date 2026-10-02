@@ -19,7 +19,9 @@ public record PendingClaimResponse(
         ClaimCategory category,
         String amountLabel,
         String claimDateLabel,
-        String accentColorKey
+        String accentColorKey,
+        /** True when a receipt photo is stored — fetch it from GET /api/claims/{id}/receipt. */
+        boolean hasReceipt
 ) {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 
@@ -34,7 +36,8 @@ public record PendingClaimResponse(
                 c.getCategory(),
                 amount.toPlainString(),
                 c.getClaimDate().format(DATE),
-                accentColorKey(c.getCategory()));
+                accentColorKey(c.getCategory()),
+                c.hasReceipt());
     }
 
     /** Maps a category to a "Warm & Human" accent key for the admin tile. */

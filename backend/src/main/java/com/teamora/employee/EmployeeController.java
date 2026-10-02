@@ -4,6 +4,8 @@ import com.teamora.common.exception.BadRequestException;
 import com.teamora.employee.dto.EmployeeDtos.ChangeRoleRequest;
 import com.teamora.employee.dto.EmployeeDtos.CreateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
+import com.teamora.employee.dto.EmployeeDtos.ResetPasswordRequest;
+import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
 import com.teamora.security.CurrentEmployeeService;
@@ -30,6 +32,16 @@ public class EmployeeController {
     public EmployeeResponse me() {
         Employee caller = currentEmployee.require();
         return employeeService.get(caller.getCompany().getId(), caller.getId());
+    }
+
+    /**
+     * Self-service update of the caller's own profile. Only {@code phone} is
+     * accepted (blank clears it); any other field in the body is ignored —
+     * everything else stays admin-only via {@code PATCH /{id}}.
+     */
+    @PatchMapping("/me")
+    public EmployeeResponse updateMe(@RequestBody SelfUpdateRequest req) {
+        return employeeService.updateOwnPhone(currentEmployee.require(), req);
     }
 
     /** Directory listing — management roles only, scoped to the caller's company. */
@@ -81,6 +93,17 @@ public class EmployeeController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public EmployeeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeRequest req) {
         return employeeService.update(currentEmployee.require(), id, req);
+    }
+
+    /**
+     * Set a new (temporary) password for an employee and sign them out everywhere.
+     * HR_ADMIN cannot reset the OWNER's password (403).
+     */
+    @PostMapping("/{id}/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
+    public void resetPassword(@PathVariable UUID id, @Valid @RequestBody ResetPasswordRequest req) {
+        employeeService.resetPassword(currentEmployee.require(), id, req.newPassword());
     }
 
     /** Hand over ownership to another employee — only the current owner may do this. */

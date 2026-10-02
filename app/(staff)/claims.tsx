@@ -4,7 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { Button, Card, Chip, EmptyState, Icon, Placeholder, ScreenHeader } from '@/components/ui';
+import { Button, Card, Chip, EmptyState, Icon, ScreenHeader } from '@/components/ui';
+import { ReceiptThumb } from '@/components/claims/ReceiptThumb';
 import { useClaims } from '@/api/queries';
 import { statusAccent } from '@/api/accents';
 import { palette, font, radius, gradients, tint } from '@/theme';
@@ -78,9 +79,13 @@ export default function Claims() {
                 const s = statusAccent(c.status);
                 return (
                   <Card key={c.id} padding={0} elevated={false} style={{ borderRadius: radius.xl, padding: 12, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={{ width: 46, height: 46, borderRadius: radius.md, overflow: 'hidden' }}>
-                      <Placeholder label="rcpt" radius={radius.md} />
-                    </View>
+                    <ReceiptThumb
+                      claimId={c.id}
+                      hasReceipt={c.hasReceipt}
+                      size={46}
+                      title={c.title}
+                      caption={`RM ${c.amountLabel} · ${c.claimDateLabel}`}
+                    />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>{c.title}</Text>
                       <Text style={[font(600), { fontSize: 11, color: palette.faint, marginTop: 6 }]}>{c.claimDateLabel}</Text>

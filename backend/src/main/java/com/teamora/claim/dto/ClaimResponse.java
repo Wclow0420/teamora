@@ -19,7 +19,9 @@ public record ClaimResponse(
         BigDecimal amount,
         String claimDateLabel,
         ClaimStatus status,
-        String statusLabel
+        String statusLabel,
+        /** True when a receipt photo is stored — fetch it from GET /api/claims/{id}/receipt. */
+        boolean hasReceipt
 ) {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 
@@ -33,7 +35,8 @@ public record ClaimResponse(
                 amount,
                 c.getClaimDate().format(DATE),
                 c.getStatus(),
-                statusLabel(c.getStatus()));
+                statusLabel(c.getStatus()),
+                c.hasReceipt());
     }
 
     private static String statusLabel(ClaimStatus status) {

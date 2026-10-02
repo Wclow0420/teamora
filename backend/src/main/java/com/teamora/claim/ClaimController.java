@@ -4,13 +4,18 @@ import com.teamora.claim.dto.ClaimResponse;
 import com.teamora.claim.dto.ClaimSummaryResponse;
 import com.teamora.claim.dto.PendingClaimResponse;
 import com.teamora.claim.dto.SubmitClaimRequest;
+import com.teamora.common.PhotoCodec;
 import com.teamora.security.CurrentEmployeeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequiredArgsConstructor
@@ -29,6 +34,20 @@ public class ClaimController {
     @PostMapping("/api/claims")
     public ClaimResponse submit(@Valid @RequestBody SubmitClaimRequest req) {
         return claimService.submit(currentEmployee.require(), req);
+    }
+
+    /**
+     * Stream a claim's receipt photo. Access (enforced in the service): the
+     * claim's owner or its approver; 403 otherwise, 404 if the claim is in
+     * another company or has no receipt.
+     */
+    @GetMapping("/api/claims/{id}/receipt")
+    public ResponseEntity<byte[]> receipt(@PathVariable UUID id) {
+        PhotoCodec.Photo photo = claimService.getReceipt(currentEmployee.require(), id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(photo.contentType()))
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.DAYS).cachePrivate())
+                .body(photo.bytes());
     }
 
     /** Admin approvals queue (ADMIN only via /api/admin/** security rule). */

@@ -8,7 +8,7 @@ import { ReportingManagerField } from '@/components/ReportingManagerField';
 import { WorkLocationField } from '@/components/WorkLocationField';
 import { useEmployee, useMe, useTransferOwnership, useUpdateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
-import type { Role, UpdateEmployeeBody } from '@/api/types';
+import { isAdminRole, type Role, type UpdateEmployeeBody } from '@/api/types';
 import { palette, font, spacing, tint } from '@/theme';
 
 type EditableRole = Extract<Role, 'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'>;
@@ -48,6 +48,9 @@ export default function EmployeeEmployment() {
   const iAmOwner = me.data?.role === 'OWNER';
   const isSelf = me.data?.id === params.id;
   const canTransfer = iAmOwner && !targetIsOwner && !isSelf;
+  // OWNER/HR_ADMIN can set a temporary password for anyone but the owner (the
+  // server 403s an HR admin resetting the owner). Your own goes via Profile.
+  const canResetPassword = !!detail.data && isAdminRole(me.data?.role) && !targetIsOwner && !isSelf;
 
   const [role, setRole] = useState<EditableRole>('EMPLOYEE');
   const [reportingManagerId, setReportingManagerId] = useState<string | undefined>(undefined);
@@ -172,6 +175,16 @@ export default function EmployeeEmployment() {
               disabled={update.isPending}
               onPress={onSave}
             />
+            {canResetPassword && (
+              <Button
+                label="Reset password"
+                icon="lock"
+                variant="light"
+                onPress={() =>
+                  router.push({ pathname: '/admin/employee-reset-password', params: { id: params.id, name } })
+                }
+              />
+            )}
             {canTransfer && (
               <Button
                 label={transfer.isPending ? 'Transferring…' : 'Transfer ownership'}

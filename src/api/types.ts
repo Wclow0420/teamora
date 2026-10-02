@@ -157,6 +157,20 @@ export type EmployeeResponse = {
   derivedHourlyRate: number | null;
 };
 
+/** Self-service password change (`POST /api/auth/change-password` → 204). */
+export type ChangePasswordBody = {
+  currentPassword: string;
+  newPassword: string;
+  /** This device's refresh token — the server keeps that one session and revokes the rest. */
+  refreshToken?: string;
+};
+
+/** Admin sets a temporary password (`POST /api/employees/{id}/reset-password` → 204). */
+export type ResetPasswordBody = { newPassword: string };
+
+/** The only self-editable field (`PATCH /api/employees/me`). A blank phone clears it. */
+export type UpdateMyDetailsBody = { phone?: string };
+
 export type ManagerOption = { id: string; fullName: string; role: Role; jobTitle: string | null };
 
 export type AuthResponse = {
@@ -321,6 +335,8 @@ export type Claim = {
   claimDateLabel: string;
   status: string;
   statusLabel: string;
+  /** True when a receipt photo is stored — fetch it via `claimApi.receiptUrl(id)`. */
+  hasReceipt: boolean;
 };
 export type ClaimSummary = { pendingTotalLabel: string; reimbursedThisMonthLabel: string; claims: Claim[] };
 export type PendingClaim = {
@@ -332,8 +348,21 @@ export type PendingClaim = {
   amountLabel: string;
   claimDateLabel: string;
   accentColorKey: string;
+  /** True when the claimant attached a receipt photo. */
+  hasReceipt: boolean;
 };
-export type SubmitClaimBody = { category: string; title: string; amount: number; claimDate: string; receiptUrl?: string };
+/**
+ * `receiptBase64` is an optional back-camera JPEG (bare base64, no `data:`
+ * prefix; server caps it at 2 MB). A claim is valid without one.
+ */
+export type SubmitClaimBody = {
+  category: string;
+  title: string;
+  amount: number;
+  claimDate: string;
+  receiptUrl?: string;
+  receiptBase64?: string;
+};
 
 // ---- Overtime ----
 export type Overtime = {

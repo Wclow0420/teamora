@@ -58,4 +58,17 @@ public class Claim extends TenantEntity {
 
     @Column(name = "receipt_url", length = 512)
     private String receiptUrl;
+
+    /**
+     * Content-type of the attached receipt photo (e.g. {@code image/jpeg}); null
+     * when the claim has no receipt. The bytes themselves live in the same row
+     * but are mapped separately by {@link ClaimReceipt}, so claim lists derive
+     * {@code hasReceipt} from this column without ever loading a photo.
+     */
+    @Column(name = "receipt_photo_type", length = 32)
+    private String receiptPhotoType;
+
+    public boolean hasReceipt() {
+        return receiptPhotoType != null;
+    }
 }

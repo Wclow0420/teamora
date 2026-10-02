@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { ScreenHeader, Button, TextField, SelectChips, DateField, toISODate, type SelectOption } from '@/components/ui';
+import { ReceiptField } from '@/components/claims/ReceiptField';
 import { useSubmitClaim } from '@/api/queries';
 import { ApiError } from '@/api/client';
 import { palette } from '@/theme';
@@ -26,6 +27,7 @@ export default function ClaimSubmit() {
   const [title, setTitle] = useState('');
   const [amountText, setAmountText] = useState('');
   const [date, setDate] = useState<Date>(today);
+  const [receipt, setReceipt] = useState<string | null>(null);
 
   const [titleError, setTitleError] = useState<string | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function ClaimSubmit() {
         title: trimmedTitle,
         amount,
         claimDate: toISODate(date),
+        ...(receipt ? { receiptBase64: receipt } : {}),
       });
       router.back();
     } catch (e) {
@@ -78,6 +81,7 @@ export default function ClaimSubmit() {
           error={amountError}
         />
         <DateField label="Date" value={date} onChange={setDate} />
+        <ReceiptField value={receipt} onChange={setReceipt} disabled={submit.isPending} />
 
         {error && <Text style={{ fontSize: 13, color: palette.danger }}>{error}</Text>}
 

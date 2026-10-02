@@ -56,6 +56,8 @@ export const onDark = {
   glow: 'rgba(236,106,77,0.10)', // the one restrained coral wash
   live: '#7FB894', // "live" status dot — sage lifted for contrast on espresso
   idle: 'rgba(255,255,255,0.32)', // static (not live) status dot
+  control: 'rgba(255,255,255,0.12)', // translucent button / chip fill on dark
+  scrim: 'rgba(28,22,16,0.92)', // full-screen photo viewer backdrop
 } as const;
 
 /**

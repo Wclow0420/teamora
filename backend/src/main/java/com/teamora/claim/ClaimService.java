@@ -4,6 +4,7 @@ import com.teamora.claim.dto.ClaimResponse;
 import com.teamora.claim.dto.ClaimSummaryResponse;
 import com.teamora.claim.dto.PendingClaimResponse;
 import com.teamora.claim.dto.SubmitClaimRequest;
+import com.teamora.common.PhotoCodec;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.employee.Employee;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class ClaimService {
 
     private final ClaimRepository claims;
+    private final ClaimReceiptRepository receipts;
     private final ApprovalNotifier notifier;
 
     /** Staff Claims screen: pending total, reimbursed-this-month, and the full list. */
@@ -54,6 +56,10 @@ public class ClaimService {
     /** Submit a new claim in PENDING state. */
     @Transactional
     public ClaimResponse submit(Employee employee, SubmitClaimRequest req) {
+        // Optional receipt photo — decoded (and size-checked → 400) before anything is saved.
+        PhotoCodec.Photo receipt = req.receiptBase64() != null && !req.receiptBase64().isBlank()
+                ? PhotoCodec.decode(req.receiptBase64())
+                : null;
         Claim claim = Claim.builder()
                 .employee(employee)
                 .category(req.category())
@@ -62,9 +68,13 @@ public class ClaimService {
                 .claimDate(req.claimDate())
                 .status(ClaimStatus.PENDING)
                 .receiptUrl(req.receiptUrl())
+                .receiptPhotoType(receipt != null ? receipt.contentType() : null)
                 .build();
         claim.setCompany(employee.getCompany());
-        Claim saved = claims.save(claim);
+        Claim saved = claims.saveAndFlush(claim);
+        if (receipt != null) {
+            receipts.attach(saved.getId(), receipt.bytes());
+        }
         notifier.notifyApprover(employee.getId(), employee.getCompany().getId(), NotificationType.APPROVAL_REQUEST,
                 "New claim", employee.getFullName() + " submitted a claim · RM " + money(saved.getAmount()));
         return ClaimResponse.from(saved);
@@ -80,6 +90,31 @@ public class ClaimService {
                 ? claims.findByStatusAndCompanyId(ClaimStatus.PENDING, caller.getCompany().getId())
                 : claims.findPendingForReportingManager(ClaimStatus.PENDING, caller.getCompany().getId(), caller.getId());
         return rows.stream().map(PendingClaimResponse::from).toList();
+    }
+
+    /**
+     * The claim's receipt photo. Access: the claim's own employee, or whoever may
+     * decide it (same-company HR_ADMIN/OWNER, or the MANAGER it routes to) — 403
+     * otherwise. Cross-tenant → 404 (as for decide); 404 too when no receipt is attached.
+     */
+    public PhotoCodec.Photo getReceipt(Employee caller, UUID id) {
+        Claim claim = claims.findByIdWithEmployeeAndManager(id)
+                .orElseThrow(() -> ResourceNotFoundException.of("Claim", id));
+        if (!claim.getCompany().getId().equals(caller.getCompany().getId())) {
+            throw ResourceNotFoundException.of("Claim", id);
+        }
+        boolean isOwner = claim.getEmployee().getId().equals(caller.getId());
+        if (!isOwner && !canDecide(claim, caller)) {
+            throw new AccessDeniedException("You cannot view this receipt");
+        }
+        if (!claim.hasReceipt()) {
+            throw ResourceNotFoundException.of("Claim receipt", id);
+        }
+        byte[] bytes = receipts.findById(id).map(ClaimReceipt::getPhoto).orElse(null);
+        if (bytes == null || bytes.length == 0) {
+            throw ResourceNotFoundException.of("Claim receipt", id);
+        }
+        return new PhotoCodec.Photo(bytes, PhotoCodec.typeOrDefault(claim.getReceiptPhotoType()));
     }
 
     @Transactional
@@ -116,13 +151,20 @@ public class ClaimService {
 
     /** HR_ADMIN/OWNER decide anything; a MANAGER decides only their direct reports' claims. */
     private void assertCanDecide(Claim claim, Employee caller) {
-        if (caller.getRole() == Role.HR_ADMIN || caller.getRole() == Role.OWNER) {
-            return;
-        }
-        Employee mgr = claim.getEmployee().getReportingManager();
-        if (mgr == null || !mgr.getId().equals(caller.getId())) {
+        if (!canDecide(claim, caller)) {
             throw new AccessDeniedException("You can only decide claims from your direct reports");
         }
+    }
+
+    private boolean canDecide(Claim claim, Employee caller) {
+        if (caller.getRole() == Role.HR_ADMIN || caller.getRole() == Role.OWNER) {
+            return true;
+        }
+        if (caller.getRole() != Role.MANAGER) {
+            return false;
+        }
+        Employee mgr = claim.getEmployee().getReportingManager();
+        return mgr != null && mgr.getId().equals(caller.getId());
     }
 
     private static String money(BigDecimal value) {
