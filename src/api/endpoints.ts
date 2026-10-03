@@ -13,6 +13,10 @@ import {
   ClaimSummary,
   ClockInBody,
   CompanyEventItem,
+  HolidaySuggestions,
+  ImportHolidayItem,
+  ImportHolidaysResult,
+  RejectBody,
   CompanyResponse,
   CompanySettings,
   CreateCompanyEventBody,
@@ -138,6 +142,15 @@ export const workLocationApi = {
     api.patch<WorkLocation>(`/api/admin/work-locations/${id}`, body),
 };
 
+/**
+ * Body for the three reject endpoints: `{ reason }` only when the approver
+ * typed one — otherwise no body at all (older servers accept no body).
+ */
+function rejectBody(reason?: string): RejectBody | undefined {
+  const trimmed = reason?.trim();
+  return trimmed ? { reason: trimmed } : undefined;
+}
+
 export const leaveApi = {
   /** My balances. `year` names a leave year by its starting calendar year; omit for the current one. */
   balances: (year?: number) =>
@@ -146,7 +159,7 @@ export const leaveApi = {
   apply: (body: ApplyLeaveBody) => api.post<LeaveRequest>('/api/leave/requests', body),
   pending: () => api.get<PendingLeave[]>('/api/admin/leave/requests?status=PENDING'),
   approve: (id: string) => api.post<void>(`/api/admin/leave/requests/${id}/approve`),
-  reject: (id: string) => api.post<void>(`/api/admin/leave/requests/${id}/reject`),
+  reject: (id: string, reason?: string) => api.post<void>(`/api/admin/leave/requests/${id}/reject`, rejectBody(reason)),
 };
 
 /** Admin view of a single employee's leave balances + entitlement overrides. */
@@ -165,7 +178,7 @@ export const claimApi = {
   submit: (body: SubmitClaimBody) => api.post<Claim>('/api/claims', body),
   pending: () => api.get<PendingClaim[]>('/api/admin/claims?status=PENDING'),
   approve: (id: string) => api.post<void>(`/api/admin/claims/${id}/approve`),
-  reject: (id: string) => api.post<void>(`/api/admin/claims/${id}/reject`),
+  reject: (id: string, reason?: string) => api.post<void>(`/api/admin/claims/${id}/reject`, rejectBody(reason)),
   /**
    * Absolute URL for a claim's receipt photo. Auth-guarded (owner or an approver
    * in the same company), so callers attach the Bearer token themselves — see
@@ -179,7 +192,7 @@ export const overtimeApi = {
   submit: (body: SubmitOvertimeBody) => api.post<Overtime>('/api/overtime', body),
   pending: () => api.get<PendingOvertime[]>('/api/admin/overtime'),
   approve: (id: string) => api.post<void>(`/api/admin/overtime/${id}/approve`),
-  reject: (id: string) => api.post<void>(`/api/admin/overtime/${id}/reject`),
+  reject: (id: string, reason?: string) => api.post<void>(`/api/admin/overtime/${id}/reject`, rejectBody(reason)),
 };
 
 export const calendarApi = {
@@ -197,6 +210,14 @@ export const calendarAdminApi = {
   update: (id: string, body: UpdateCompanyEventBody) =>
     api.patch<CompanyEventItem>(`/api/admin/calendar/events/${id}`, body),
   remove: (id: string) => api.del<void>(`/api/admin/calendar/events/${id}`),
+  /** Suggested Malaysian public holidays for `year`, flagged when already on the calendar. */
+  holidaySuggestions: (year?: number) =>
+    api.get<HolidaySuggestions>(
+      `/api/admin/calendar/holiday-suggestions${year != null ? `?year=${year}` : ''}`,
+    ),
+  /** Adds the ticked holidays as HOLIDAY events; dates already holding a holiday are skipped. */
+  importHolidays: (items: ImportHolidayItem[]) =>
+    api.post<ImportHolidaysResult>('/api/admin/calendar/holiday-import', { items }),
 };
 
 export const notificationApi = {

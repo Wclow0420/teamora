@@ -4,6 +4,7 @@ import com.teamora.claim.dto.ClaimResponse;
 import com.teamora.claim.dto.ClaimSummaryResponse;
 import com.teamora.claim.dto.PendingClaimResponse;
 import com.teamora.claim.dto.SubmitClaimRequest;
+import com.teamora.common.DeclineRequest;
 import com.teamora.common.PhotoCodec;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
@@ -119,15 +120,16 @@ public class ClaimService {
 
     @Transactional
     public ClaimResponse approve(UUID id, Employee admin) {
-        return decide(id, admin, ClaimStatus.APPROVED);
+        return decide(id, admin, ClaimStatus.APPROVED, null);
     }
 
+    /** Reject a pending claim, optionally with a reason the requester will see. */
     @Transactional
-    public ClaimResponse reject(UUID id, Employee admin) {
-        return decide(id, admin, ClaimStatus.REJECTED);
+    public ClaimResponse reject(UUID id, Employee admin, String decisionNote) {
+        return decide(id, admin, ClaimStatus.REJECTED, decisionNote);
     }
 
-    private ClaimResponse decide(UUID id, Employee admin, ClaimStatus target) {
+    private ClaimResponse decide(UUID id, Employee admin, ClaimStatus target, String decisionNote) {
         Claim claim = claims.findByIdWithEmployeeAndManager(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Claim", id));
         if (!claim.getCompany().getId().equals(admin.getCompany().getId())) {
@@ -141,11 +143,12 @@ public class ClaimService {
         claim.setStatus(target);
         claim.setDecidedBy(admin);
         claim.setDecidedAt(Instant.now());
+        claim.setDecisionNote(decisionNote);
         boolean approved = target == ClaimStatus.APPROVED;
         notifier.notifyRequester(claim.getEmployee(),
                 approved ? NotificationType.CLAIM_APPROVED : NotificationType.CLAIM_REJECTED,
                 approved ? "Claim approved" : "Claim declined",
-                "Your claim '" + claim.getTitle() + "' (RM " + money(claim.getAmount()) + ") was " + (approved ? "approved." : "declined."));
+                "Your claim '" + claim.getTitle() + "' (RM " + money(claim.getAmount()) + ") was " + (approved ? "approved." : "declined" + DeclineRequest.declinedSuffix(decisionNote)));
         return ClaimResponse.from(claims.save(claim));
     }
 

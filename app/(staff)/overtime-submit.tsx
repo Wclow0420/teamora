@@ -3,7 +3,7 @@ import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { Button, Card, Chip, DateField, ScreenHeader, TextField, toISODate } from '@/components/ui';
+import { Button, Card, Chip, DateField, DecisionNote, ScreenHeader, TextField, toISODate } from '@/components/ui';
 import { useOvertime, useSubmitOvertime } from '@/api/queries';
 import { statusAccent } from '@/api/accents';
 import { ApiError } from '@/api/client';
@@ -60,7 +60,8 @@ export default function OvertimeSubmit() {
                 <View key={o.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderTopColor: palette.line }}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[font(700), { fontSize: 13.5, color: palette.ink }]}>{o.hoursLabel} · {o.workDateLabel}</Text>
-                    {o.reason && <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 4 }]} numberOfLines={1}>{o.reason}</Text>}
+                    {!!o.reason && <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 4 }]} numberOfLines={1}>{o.reason}</Text>}
+                    <DecisionNote note={o.decisionNote} />
                   </View>
                   <Chip label={o.statusLabel} background={accent.bg} color={accent.color} size="sm" />
                 </View>

@@ -1,5 +1,6 @@
 package com.teamora.overtime;
 
+import com.teamora.common.DeclineRequest;
 import com.teamora.overtime.dto.OvertimeDtos.OvertimeResponse;
 import com.teamora.overtime.dto.OvertimeDtos.PendingOvertimeResponse;
 import com.teamora.overtime.dto.OvertimeDtos.SubmitOvertimeRequest;
@@ -40,8 +41,9 @@ public class OvertimeController {
         overtimeService.approve(id, currentEmployee.require());
     }
 
+    /** Decline; the body {@code { "reason": "..." }} is optional (≤300 chars, shown to the requester). */
     @PostMapping("/api/admin/overtime/{id}/reject")
-    public void reject(@PathVariable UUID id) {
-        overtimeService.reject(id, currentEmployee.require());
+    public void reject(@PathVariable UUID id, @RequestBody(required = false) DeclineRequest body) {
+        overtimeService.reject(id, currentEmployee.require(), DeclineRequest.normalise(body));
     }
 }

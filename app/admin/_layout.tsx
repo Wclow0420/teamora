@@ -32,6 +32,7 @@ export default function AdminLayout() {
       <Stack.Screen name="work-location-edit" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="calendar-events" />
       <Stack.Screen name="calendar-event-edit" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="holiday-import" />
     </Stack>
   );
 }

@@ -4,6 +4,7 @@ import com.teamora.claim.dto.ClaimResponse;
 import com.teamora.claim.dto.ClaimSummaryResponse;
 import com.teamora.claim.dto.PendingClaimResponse;
 import com.teamora.claim.dto.SubmitClaimRequest;
+import com.teamora.common.DeclineRequest;
 import com.teamora.common.PhotoCodec;
 import com.teamora.security.CurrentEmployeeService;
 import jakarta.validation.Valid;
@@ -63,8 +64,9 @@ public class ClaimController {
         return claimService.approve(id, currentEmployee.require());
     }
 
+    /** Decline; the body {@code { "reason": "..." }} is optional (≤300 chars, shown to the requester). */
     @PostMapping("/api/admin/claims/{id}/reject")
-    public ClaimResponse reject(@PathVariable UUID id) {
-        return claimService.reject(id, currentEmployee.require());
+    public ClaimResponse reject(@PathVariable UUID id, @RequestBody(required = false) DeclineRequest body) {
+        return claimService.reject(id, currentEmployee.require(), DeclineRequest.normalise(body));
     }
 }

@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { ScreenHeader, Button, Card, Chip, EmptyState, Icon } from '@/components/ui';
+import { ScreenHeader, Button, Card, Chip, EmptyState, Icon, IconTile } from '@/components/ui';
 import { useAdminCalendarEvents } from '@/api/queries';
 import { accentFromKey } from '@/api/accents';
 import type { CompanyEventItem, EventTypeValue } from '@/api/types';
@@ -88,6 +88,7 @@ export default function CalendarEvents() {
     });
 
   const events = q.data ?? [];
+  const openHolidayImport = () => router.push('/admin/holiday-import');
 
   return (
     <Screen>
@@ -97,6 +98,20 @@ export default function CalendarEvents() {
         Public holidays, company events and townhalls. Everyone sees these on their
         calendar, and holidays are paid in payroll.
       </Text>
+
+      {/* Malaysian public holidays — a suggested list the admin reviews */}
+      <Card onPress={openHolidayImport} padding={14} style={{ borderRadius: radius['2xl'], marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+          <IconTile icon="calendar" color={palette.sage} background={tint.sage} size={42} iconSize={20} cornerRadius={radius.md} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[font(700), { fontSize: 13.5, lineHeight: 18, color: palette.ink }]}>Add Malaysian public holidays</Text>
+            <Text style={[font(500), { fontSize: 11.5, lineHeight: 16, color: palette.faint, marginTop: 2 }]}>
+              Review a suggested list and pick what applies to your state
+            </Text>
+          </View>
+          <Icon name="chevR" size={16} color={palette.faint} />
+        </View>
+      </Card>
 
       {/* month stepper */}
       <View
@@ -121,6 +136,7 @@ export default function CalendarEvents() {
               subtitle="Add your public holidays and company events so the team can plan around them."
               tone={{ color: palette.coral, bg: tint.coral }}
               action={{ label: 'Add event', icon: 'plus', onPress: openNew }}
+              secondaryAction={{ label: 'Add Malaysian public holidays', icon: 'calendar', onPress: openHolidayImport }}
             />
           ) : (
             <View style={{ gap: 10 }}>

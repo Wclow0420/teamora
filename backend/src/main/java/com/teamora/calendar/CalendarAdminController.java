@@ -2,6 +2,9 @@ package com.teamora.calendar;
 
 import com.teamora.calendar.dto.CalendarDtos.CompanyEventResponse;
 import com.teamora.calendar.dto.CalendarDtos.CreateCompanyEventRequest;
+import com.teamora.calendar.dto.CalendarDtos.HolidayImportRequest;
+import com.teamora.calendar.dto.CalendarDtos.HolidayImportResponse;
+import com.teamora.calendar.dto.CalendarDtos.HolidaySuggestionsResponse;
 import com.teamora.calendar.dto.CalendarDtos.UpdateCompanyEventRequest;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.security.CurrentEmployeeService;
@@ -11,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -55,6 +59,25 @@ public class CalendarAdminController {
     @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public void delete(@PathVariable UUID id) {
         calendarService.delete(currentEmployee.require().getCompany().getId(), id);
+    }
+
+    /**
+     * Suggested Malaysian public holidays for {@code year} (defaults to the current year), each
+     * flagged when the company already has a HOLIDAY on that date. A suggestion list only —
+     * nothing is inserted until the admin confirms via {@code holiday-import}.
+     */
+    @GetMapping("/api/admin/calendar/holiday-suggestions")
+    @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
+    public HolidaySuggestionsResponse holidaySuggestions(@RequestParam(required = false) Integer year) {
+        int y = year != null ? year : LocalDate.now(com.teamora.common.Zones.KL).getYear();
+        return calendarService.holidaySuggestions(currentEmployee.require().getCompany().getId(), y);
+    }
+
+    /** Add the admin-picked holidays as HOLIDAY events; dates that already have one are skipped. */
+    @PostMapping("/api/admin/calendar/holiday-import")
+    @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
+    public HolidayImportResponse importHolidays(@Valid @RequestBody HolidayImportRequest req) {
+        return calendarService.importHolidays(currentEmployee.require().getCompany(), req);
     }
 
     private static YearMonth parseMonth(String month) {

@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { Button, Card, Chip, EmptyState, Icon, ScreenHeader } from '@/components/ui';
+import { Button, Card, Chip, DecisionNote, EmptyState, Icon, ScreenHeader } from '@/components/ui';
 import { ReceiptThumb } from '@/components/claims/ReceiptThumb';
 import { useClaims } from '@/api/queries';
 import { statusAccent } from '@/api/accents';
@@ -89,6 +89,7 @@ export default function Claims() {
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>{c.title}</Text>
                       <Text style={[font(600), { fontSize: 11, color: palette.faint, marginTop: 6 }]}>{c.claimDateLabel}</Text>
+                      <DecisionNote note={c.decisionNote} />
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={[font(800), { fontSize: 14, color: palette.ink }]}>RM {c.amountLabel}</Text>

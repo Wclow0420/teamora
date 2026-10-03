@@ -13,6 +13,8 @@ export type EmptyStateProps = {
   tone?: { color: string; bg: string };
   /** Optional call-to-action button. */
   action?: { label: string; icon?: IconName; onPress: () => void };
+  /** Optional quieter second action under the CTA. */
+  secondaryAction?: { label: string; icon?: IconName; onPress: () => void };
 };
 
 /**
@@ -20,7 +22,7 @@ export type EmptyStateProps = {
  * tinted icon + title + optional subtitle + optional CTA. Use inside an
  * AsyncBoundary's success branch when a collection is empty.
  */
-export function EmptyState({ icon, title, subtitle, tone, action }: EmptyStateProps) {
+export function EmptyState({ icon, title, subtitle, tone, action, secondaryAction }: EmptyStateProps) {
   const color = tone?.color ?? palette.soft;
   const bg = tone?.bg ?? tint.neutral;
   return (
@@ -46,6 +48,15 @@ export function EmptyState({ icon, title, subtitle, tone, action }: EmptyStatePr
       ) : null}
       {action ? (
         <Button label={action.label} icon={action.icon} onPress={action.onPress} style={{ marginTop: 18, alignSelf: 'stretch' }} />
+      ) : null}
+      {secondaryAction ? (
+        <Button
+          label={secondaryAction.label}
+          icon={secondaryAction.icon}
+          variant="light"
+          onPress={secondaryAction.onPress}
+          style={{ marginTop: action ? 10 : 18, alignSelf: 'stretch' }}
+        />
       ) : null}
     </Card>
   );

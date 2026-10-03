@@ -47,4 +47,8 @@ public class OvertimeRequest extends TenantEntity {
 
     @Column(name = "decided_at")
     private Instant decidedAt;
+
+    /** Optional reason the approver gave when declining (null otherwise). */
+    @Column(name = "decision_note", length = 300)
+    private String decisionNote;
 }

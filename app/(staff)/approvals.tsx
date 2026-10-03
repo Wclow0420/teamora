@@ -10,6 +10,7 @@ import {
   LeaveApprovalCard,
   OvertimeApprovalCard,
 } from '@/components/approvals/ApprovalCards';
+import { DeclineSheet } from '@/components/approvals/DeclineSheet';
 import { usePendingClaims, usePendingLeave, usePendingOvertime } from '@/api/queries';
 import { useApprovalDecisions } from '@/hooks';
 
@@ -87,6 +88,8 @@ export default function StaffApprovals() {
             ))}
         </AsyncBoundary>
       )}
+
+      <DeclineSheet {...decisions.declineSheet} />
     </Screen>
   );
 }

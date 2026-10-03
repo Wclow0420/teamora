@@ -1,5 +1,6 @@
 package com.teamora.leave;
 
+import com.teamora.common.DeclineRequest;
 import com.teamora.leave.dto.ApplyLeaveRequest;
 import com.teamora.leave.dto.LeaveBalanceResponse;
 import com.teamora.leave.dto.LeaveRequestResponse;
@@ -52,8 +53,9 @@ public class LeaveController {
         leaveService.approve(id, currentEmployee.require());
     }
 
+    /** Decline; the body {@code { "reason": "..." }} is optional (≤300 chars, shown to the requester). */
     @PostMapping("/api/admin/leave/requests/{id}/reject")
-    public void reject(@PathVariable UUID id) {
-        leaveService.reject(id, currentEmployee.require());
+    public void reject(@PathVariable UUID id, @RequestBody(required = false) DeclineRequest body) {
+        leaveService.reject(id, currentEmployee.require(), DeclineRequest.normalise(body));
     }
 }

@@ -21,7 +21,9 @@ public record ClaimResponse(
         ClaimStatus status,
         String statusLabel,
         /** True when a receipt photo is stored — fetch it from GET /api/claims/{id}/receipt. */
-        boolean hasReceipt
+        boolean hasReceipt,
+        /** Approver's optional reason when declined; null otherwise. */
+        String decisionNote
 ) {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 
@@ -36,7 +38,8 @@ public record ClaimResponse(
                 c.getClaimDate().format(DATE),
                 c.getStatus(),
                 statusLabel(c.getStatus()),
-                c.hasReceipt());
+                c.hasReceipt(),
+                c.getDecisionNote());
     }
 
     private static String statusLabel(ClaimStatus status) {

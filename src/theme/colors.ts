@@ -58,6 +58,7 @@ export const onDark = {
   idle: 'rgba(255,255,255,0.32)', // static (not live) status dot
   control: 'rgba(255,255,255,0.12)', // translucent button / chip fill on dark
   scrim: 'rgba(28,22,16,0.92)', // full-screen photo viewer backdrop
+  backdrop: 'rgba(28,22,16,0.45)', // dimmed backdrop behind a bottom sheet
 } as const;
 
 /**

@@ -56,6 +56,10 @@ public class Claim extends TenantEntity {
     @Column(name = "decided_at")
     private Instant decidedAt;
 
+    /** Optional reason the approver gave when declining (null otherwise). */
+    @Column(name = "decision_note", length = 300)
+    private String decisionNote;
+
     @Column(name = "receipt_url", length = 512)
     private String receiptUrl;
 

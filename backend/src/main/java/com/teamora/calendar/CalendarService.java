@@ -2,6 +2,11 @@ package com.teamora.calendar;
 
 import com.teamora.calendar.dto.CalendarDtos.CompanyEventResponse;
 import com.teamora.calendar.dto.CalendarDtos.CreateCompanyEventRequest;
+import com.teamora.calendar.dto.CalendarDtos.HolidayImportItem;
+import com.teamora.calendar.dto.CalendarDtos.HolidayImportRequest;
+import com.teamora.calendar.dto.CalendarDtos.HolidayImportResponse;
+import com.teamora.calendar.dto.CalendarDtos.HolidaySuggestion;
+import com.teamora.calendar.dto.CalendarDtos.HolidaySuggestionsResponse;
 import com.teamora.calendar.dto.CalendarDtos.MonthCalendarResponse;
 import com.teamora.calendar.dto.CalendarDtos.UpcomingEvent;
 import com.teamora.calendar.dto.CalendarDtos.UpdateCompanyEventRequest;
@@ -20,11 +25,15 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+
+import static com.teamora.calendar.dto.CalendarDtos.HOLIDAY_SOURCE;
 
 /**
  * The company calendar: the staff month grid / upcoming list, plus admin CRUD over
@@ -48,6 +57,7 @@ public class CalendarService {
 
     private final CompanyEventRepository events;
     private final LeaveRequestRepository leave;
+    private final HolidayCatalogue holidayCatalogue;
 
     /** The month grid (event dots per day) + the upcoming list for a caller. */
     public MonthCalendarResponse month(Employee caller, YearMonth ym) {
@@ -135,6 +145,64 @@ public class CalendarService {
     @Transactional
     public void delete(UUID companyId, UUID id) {
         events.delete(requireInCompany(companyId, id));
+    }
+
+    // ---------- Malaysian public holiday import ----------
+
+    /**
+     * The catalogue's suggestions for {@code year}, each flagged {@code alreadyAdded} when the
+     * company already has a HOLIDAY on that date. A year outside the catalogue → no items.
+     */
+    public HolidaySuggestionsResponse holidaySuggestions(UUID companyId, int year) {
+        List<HolidayCatalogue.Entry> suggestions = holidayCatalogue.forYear(year);
+        if (suggestions.isEmpty()) {
+            return new HolidaySuggestionsResponse(year, HOLIDAY_SOURCE, holidayCatalogue.years(), List.of());
+        }
+        Set<LocalDate> existing = holidayDates(companyId,
+                LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+        List<HolidaySuggestion> items = suggestions.stream()
+                .map(h -> new HolidaySuggestion(h.date(), h.name(), h.note(), existing.contains(h.date())))
+                .toList();
+        return new HolidaySuggestionsResponse(year, HOLIDAY_SOURCE, holidayCatalogue.years(), items);
+    }
+
+    /**
+     * Create a HOLIDAY event per item, skipping any date that already has a HOLIDAY (including a
+     * date repeated within the same request). Affects future payroll runs — see the class note.
+     */
+    @Transactional
+    public HolidayImportResponse importHolidays(Company company, HolidayImportRequest req) {
+        List<HolidayImportItem> items = req.items();
+        LocalDate min = items.stream().map(HolidayImportItem::date).min(LocalDate::compareTo).orElseThrow();
+        LocalDate max = items.stream().map(HolidayImportItem::date).max(LocalDate::compareTo).orElseThrow();
+        Set<LocalDate> taken = holidayDates(company.getId(), min, max);
+
+        int created = 0;
+        int skipped = 0;
+        for (HolidayImportItem item : items) {
+            if (!taken.add(item.date())) {
+                skipped++;
+                continue;
+            }
+            CompanyEvent e = CompanyEvent.builder()
+                    .title(item.name().trim())
+                    .eventDate(item.date())
+                    .eventType(EventType.HOLIDAY)
+                    .build();
+            e.setCompany(company);
+            events.save(e);
+            created++;
+        }
+        return new HolidayImportResponse(created, skipped);
+    }
+
+    private Set<LocalDate> holidayDates(UUID companyId, LocalDate from, LocalDate to) {
+        Set<LocalDate> dates = new HashSet<>();
+        for (CompanyEvent e : events.findByCompanyIdAndEventTypeAndEventDateBetween(
+                companyId, EventType.HOLIDAY, from, to)) {
+            dates.add(e.getEventDate());
+        }
+        return dates;
     }
 
     /** Resolve an event by id within the caller's company — a foreign row is a 404, never a peek. */

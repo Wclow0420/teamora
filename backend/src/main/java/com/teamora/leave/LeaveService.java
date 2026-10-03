@@ -1,5 +1,6 @@
 package com.teamora.leave;
 
+import com.teamora.common.DeclineRequest;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.employee.Employee;
@@ -187,15 +188,17 @@ public class LeaveService {
                 "Leave approved", "Your " + r.getLeaveType().label() + " was approved.");
     }
 
-    /** Reject a pending request. */
+    /** Reject a pending request, optionally with a reason the requester will see. */
     @Transactional
-    public void reject(UUID id, Employee admin) {
+    public void reject(UUID id, Employee admin, String decisionNote) {
         LeaveRequest r = mustBePending(id, admin);
         r.setStatus(LeaveStatus.REJECTED);
         r.setDecidedBy(admin);
         r.setDecidedAt(Instant.now());
+        r.setDecisionNote(decisionNote);
         notifier.notifyRequester(r.getEmployee(), NotificationType.LEAVE_REJECTED,
-                "Leave declined", "Your " + r.getLeaveType().label() + " was declined.");
+                "Leave declined", "Your " + r.getLeaveType().label() + " was declined"
+                        + DeclineRequest.declinedSuffix(decisionNote));
     }
 
     private LeaveRequest mustBePending(UUID id, Employee admin) {

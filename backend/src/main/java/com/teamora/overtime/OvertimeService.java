@@ -1,5 +1,6 @@
 package com.teamora.overtime;
 
+import com.teamora.common.DeclineRequest;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.employee.Employee;
@@ -64,15 +65,16 @@ public class OvertimeService {
 
     @Transactional
     public void approve(UUID id, Employee caller) {
-        decide(id, caller, OvertimeStatus.APPROVED);
+        decide(id, caller, OvertimeStatus.APPROVED, null);
     }
 
+    /** Reject pending overtime, optionally with a reason the requester will see. */
     @Transactional
-    public void reject(UUID id, Employee caller) {
-        decide(id, caller, OvertimeStatus.REJECTED);
+    public void reject(UUID id, Employee caller, String decisionNote) {
+        decide(id, caller, OvertimeStatus.REJECTED, decisionNote);
     }
 
-    private void decide(UUID id, Employee caller, OvertimeStatus target) {
+    private void decide(UUID id, Employee caller, OvertimeStatus target, String decisionNote) {
         OvertimeRequest o = overtime.findByIdWithEmployeeAndManager(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("OvertimeRequest", id));
         if (!o.getCompany().getId().equals(caller.getCompany().getId())) {
@@ -85,11 +87,12 @@ public class OvertimeService {
         o.setStatus(target);
         o.setDecidedBy(caller);
         o.setDecidedAt(Instant.now());
+        o.setDecisionNote(decisionNote);
         boolean approved = target == OvertimeStatus.APPROVED;
         notifier.notifyRequester(o.getEmployee(),
                 approved ? NotificationType.OVERTIME_APPROVED : NotificationType.OVERTIME_REJECTED,
                 approved ? "Overtime approved" : "Overtime declined",
-                "Your " + hoursLabel(o.getHours()) + " overtime was " + (approved ? "approved." : "declined."));
+                "Your " + hoursLabel(o.getHours()) + " overtime was " + (approved ? "approved." : "declined" + DeclineRequest.declinedSuffix(decisionNote)));
     }
 
     /** HR_ADMIN/OWNER decide anything; a MANAGER decides only their direct reports'. */

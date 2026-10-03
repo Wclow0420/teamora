@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi, authApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveBalanceAdminApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
 import { getRefreshToken } from './tokenStore';
-import type { ApplyLeaveBody, AssignShiftBody, ChangePasswordBody, ClockInBody, ResetPasswordWithCodeBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody } from './types';
+import type { ApplyLeaveBody, AssignShiftBody, ChangePasswordBody, ClockInBody, ResetPasswordWithCodeBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody, ImportHolidayItem } from './types';
 
 /** Centralised query keys. */
 export const qk = {
@@ -29,6 +29,7 @@ export const qk = {
   workLocations: ['workLocations', 'active'] as const,
   adminWorkLocations: ['workLocations', 'all'] as const,
   adminCalendar: (month?: string) => ['adminCalendar', month ?? 'current'] as const,
+  holidaySuggestions: (year?: number) => ['adminCalendar', 'holidays', year ?? 'default'] as const,
 };
 
 // ---- Profile ----
@@ -187,8 +188,8 @@ export function useApplyLeave() {
 export function useDecideLeave() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'reject' }) =>
-      decision === 'approve' ? leaveApi.approve(id) : leaveApi.reject(id),
+    mutationFn: ({ id, decision, reason }: { id: string; decision: 'approve' | 'reject'; reason?: string }) =>
+      decision === 'approve' ? leaveApi.approve(id) : leaveApi.reject(id, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leave'] }),
   });
 }
@@ -207,8 +208,8 @@ export function useSubmitClaim() {
 export function useDecideClaim() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'reject' }) =>
-      decision === 'approve' ? claimApi.approve(id) : claimApi.reject(id),
+    mutationFn: ({ id, decision, reason }: { id: string; decision: 'approve' | 'reject'; reason?: string }) =>
+      decision === 'approve' ? claimApi.approve(id) : claimApi.reject(id, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['claims'] }),
   });
 }
@@ -227,8 +228,8 @@ export function useSubmitOvertime() {
 export function useDecideOvertime() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'reject' }) =>
-      decision === 'approve' ? overtimeApi.approve(id) : overtimeApi.reject(id),
+    mutationFn: ({ id, decision, reason }: { id: string; decision: 'approve' | 'reject'; reason?: string }) =>
+      decision === 'approve' ? overtimeApi.approve(id) : overtimeApi.reject(id, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['overtime'] }),
   });
 }
@@ -306,6 +307,20 @@ export function useUpdateCompanyEvent() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateCompanyEventBody }) => calendarAdminApi.update(id, body),
+    onSuccess: () => invalidateCalendars(qc),
+  });
+}
+/**
+ * Suggested Malaysian public holidays for `year`. Keyed under `adminCalendar`
+ * so any calendar mutation refreshes the "Added" flags too.
+ */
+export const useHolidaySuggestions = (year?: number) =>
+  useQuery({ queryKey: qk.holidaySuggestions(year), queryFn: () => calendarAdminApi.holidaySuggestions(year) });
+
+export function useImportHolidays() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: ImportHolidayItem[]) => calendarAdminApi.importHolidays(items),
     onSuccess: () => invalidateCalendars(qc),
   });
 }

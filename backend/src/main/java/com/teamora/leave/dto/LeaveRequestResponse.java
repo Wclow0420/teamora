@@ -25,7 +25,9 @@ public record LeaveRequestResponse(
         BigDecimal days,
         String reason,
         LeaveStatus status,
-        String statusLabel
+        String statusLabel,
+        /** Approver's optional reason when declined; null otherwise. */
+        String decisionNote
 ) {
     public static LeaveRequestResponse from(LeaveRequest r) {
         LeaveType t = r.getLeaveType();
@@ -45,6 +47,7 @@ public record LeaveRequestResponse(
                 r.getDays(),
                 r.getReason(),
                 r.getStatus(),
-                r.getStatus().label());
+                r.getStatus().label(),
+                r.getDecisionNote());
     }
 }

@@ -2,6 +2,7 @@ package com.teamora.calendar.dto;
 
 import com.teamora.calendar.CompanyEvent;
 import com.teamora.calendar.EventType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -75,4 +76,44 @@ public final class CalendarDtos {
             EventType eventType,
             @Size(max = TIME_LABEL_MAX) String timeLabel
     ) {}
+
+    // ---------- Malaysian public holiday import (suggested list, admin confirms) ----------
+
+    /** Shown under the suggestion list: the data is a third-party compilation, not the gazette. */
+    public static final String HOLIDAY_SOURCE =
+            "Based on published Malaysian public holiday lists — check against the official gazette for your state.";
+
+    /** Max holidays per import request, and max name length. */
+    public static final int HOLIDAY_IMPORT_MAX = 40;
+    public static final int HOLIDAY_NAME_MAX = 100;
+
+    /** One suggested holiday; {@code alreadyAdded} = the company already has a HOLIDAY on that date. */
+    public record HolidaySuggestion(
+            LocalDate date,
+            String name,
+            String note,
+            boolean alreadyAdded
+    ) {}
+
+    /** GET /api/admin/calendar/holiday-suggestions. {@code years} = years the catalogue covers. */
+    public record HolidaySuggestionsResponse(
+            int year,
+            String source,
+            List<Integer> years,
+            List<HolidaySuggestion> items
+    ) {}
+
+    /** One holiday to add. */
+    public record HolidayImportItem(
+            @NotNull LocalDate date,
+            @NotBlank @Size(min = 1, max = HOLIDAY_NAME_MAX) String name
+    ) {}
+
+    /** POST /api/admin/calendar/holiday-import body. */
+    public record HolidayImportRequest(
+            @NotNull @Size(min = 1, max = HOLIDAY_IMPORT_MAX) List<@Valid @NotNull HolidayImportItem> items
+    ) {}
+
+    /** How many HOLIDAY events were created vs skipped (that date already had a HOLIDAY). */
+    public record HolidayImportResponse(int created, int skipped) {}
 }

@@ -3,7 +3,7 @@ import { View, Text, useWindowDimensions, type TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { Button, Card, Chip, EmptyState, IconTile, ProgressBar, ScreenHeader } from '@/components/ui';
+import { Button, Card, Chip, DecisionNote, EmptyState, IconTile, ProgressBar, ScreenHeader } from '@/components/ui';
 import { useLeaveBalances, useLeaveRequests } from '@/api/queries';
 import { accentFromKey, statusAccent } from '@/api/accents';
 import type { LeaveBalance } from '@/api/types';
@@ -129,6 +129,7 @@ export default function Leave() {
                       <Text style={[font(600), { fontSize: 11.5, color: palette.faint, marginTop: 5 }]}>
                         {r.dateRangeLabel} · {r.durationLabel}
                       </Text>
+                      <DecisionNote note={r.decisionNote} />
                     </View>
                     <Chip label={r.statusLabel} color={s.color} background={s.bg} size="sm" />
                   </Card>

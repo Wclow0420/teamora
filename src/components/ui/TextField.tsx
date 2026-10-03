@@ -13,6 +13,8 @@ type Props = {
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   multiline?: boolean;
+  /** Hard cap on characters typed (mirrors a server-side limit). */
+  maxLength?: number;
   error?: string | null;
   /** Quiet guidance under the field (e.g. a password rule). Replaced by `error` when there is one. */
   helper?: string;
@@ -29,6 +31,7 @@ export function TextField({
   keyboardType,
   autoCapitalize = 'sentences',
   multiline = false,
+  maxLength,
   error,
   helper,
 }: Props) {
@@ -61,7 +64,10 @@ export function TextField({
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
           multiline={multiline}
-          style={[font(500), { flex: 1, fontSize: 14, color: palette.ink, paddingTop: multiline ? 0 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]}
+          maxLength={maxLength}
+          // Multiline: the input fills the whole box (minHeight = box 88 − padding 24),
+          // otherwise only the first line is tappable and taps lower down miss it.
+          style={[font(500), { flex: 1, fontSize: 14, color: palette.ink, paddingTop: multiline ? 0 : undefined, textAlignVertical: multiline ? 'top' : 'center', minHeight: multiline ? 64 : undefined }]}
         />
       </View>
       {error ? (

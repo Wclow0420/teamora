@@ -23,3 +23,4 @@ export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
 export { HeroCard } from './HeroCard';
 export { MonthStepper } from './MonthStepper';
+export { DecisionNote } from './DecisionNote';

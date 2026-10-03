@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { palette, radius, font, shadows } from '@/theme';
 import { Icon, IconName } from './Icon';
 
-type Variant = 'primary' | 'dark' | 'light' | 'ghost' | 'success';
+type Variant = 'primary' | 'dark' | 'light' | 'ghost' | 'success' | 'danger';
 
 type Props = {
   label: string;
@@ -33,11 +33,13 @@ type Skin = { bg: string; fg: string; pressedBg: string; border?: string; shadow
  *   light   → white on cream, hairline border (tertiary)
  *   ghost   → transparent / text only
  *   success → sage solid (approve actions)
+ *   danger  → muted red solid (destructive confirms, e.g. Decline)
  */
 const SKINS: Record<Variant, Skin> = {
   primary: { bg: palette.coral, fg: palette.white, pressedBg: '#D9502F', shadow: shadows.coral },
   dark: { bg: palette.ink, fg: palette.white, pressedBg: '#20180F' },
   success: { bg: palette.sage, fg: palette.white, pressedBg: '#4E7C60' },
+  danger: { bg: palette.danger, fg: palette.white, pressedBg: '#A84834' },
   light: { bg: palette.surface, fg: palette.coral, pressedBg: '#FBF3EC', border: palette.line, shadow: shadows.card },
   ghost: { bg: 'transparent', fg: palette.soft, pressedBg: 'rgba(44,38,32,0.05)' },
 };

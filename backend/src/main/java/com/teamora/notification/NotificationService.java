@@ -18,6 +18,10 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class NotificationService {
 
+    /** Column limits on {@code notifications.title} / {@code .body}. */
+    private static final int TITLE_MAX = 160;
+    private static final int BODY_MAX = 500;
+
     private final NotificationRepository notifications;
     private final PushTokenRepository pushTokens;
     private final ExpoPushService expoPush;
@@ -50,6 +54,9 @@ public class NotificationService {
     /** Create an in-app notification and fan it out to the employee's devices via push. */
     @Transactional
     public void create(Employee employee, NotificationType type, String title, String body) {
+        // Bodies interpolate user text (claim titles, decline reasons) — never let that overflow the columns.
+        title = clip(title, TITLE_MAX);
+        body = clip(body, BODY_MAX);
         Notification n = Notification.builder()
                 .employee(employee)
                 .type(type)
@@ -82,5 +89,12 @@ public class NotificationService {
     @Transactional
     public void removePushToken(String token) {
         pushTokens.deleteByToken(token);
+    }
+
+    private static String clip(String s, int max) {
+        if (s == null || s.length() <= max) {
+            return s;
+        }
+        return s.substring(0, max - 1) + "\u2026";
     }
 }

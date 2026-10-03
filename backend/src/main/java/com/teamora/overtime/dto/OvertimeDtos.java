@@ -29,12 +29,15 @@ public final class OvertimeDtos {
             String hoursLabel,
             String reason,
             String status,
-            String statusLabel
+            String statusLabel,
+            /** Approver's optional reason when declined; null otherwise. */
+            String decisionNote
     ) {
         public static OvertimeResponse from(OvertimeRequest o) {
             return new OvertimeResponse(
                     o.getId(), fmtDate(o.getWorkDate()), fmtHours(o.getHours()),
-                    o.getReason(), o.getStatus().name(), o.getStatus().label());
+                    o.getReason(), o.getStatus().name(), o.getStatus().label(),
+                    o.getDecisionNote());
         }
     }
 

@@ -1,0 +1,22 @@
+[
+  {"year": 2026, "date": "2026-11-08", "name": "Deepavali", "note": "Not observed in Sarawak"},
+  {"year": 2026, "date": "2026-12-25", "name": "Christmas Day", "note": null},
+  {"year": 2027, "date": "2027-01-01", "name": "New Year's Day", "note": "Not observed in Johor, Kedah, Kelantan, Perlis, Terengganu"},
+  {"year": 2027, "date": "2027-01-06", "name": "Israk and Mikraj", "note": "Some states only"},
+  {"year": 2027, "date": "2027-01-22", "name": "Thaipusam", "note": "Some states only"},
+  {"year": 2027, "date": "2027-02-01", "name": "Federal Territory Day", "note": "Kuala Lumpur, Labuan and Putrajaya only"},
+  {"year": 2027, "date": "2027-02-06", "name": "Chinese New Year", "note": null},
+  {"year": 2027, "date": "2027-02-07", "name": "Chinese New Year (second day)", "note": null},
+  {"year": 2027, "date": "2027-03-10", "name": "Hari Raya Aidilfitri", "note": null},
+  {"year": 2027, "date": "2027-03-11", "name": "Hari Raya Aidilfitri (second day)", "note": null},
+  {"year": 2027, "date": "2027-05-01", "name": "Labour Day", "note": null},
+  {"year": 2027, "date": "2027-05-17", "name": "Hari Raya Haji", "note": null},
+  {"year": 2027, "date": "2027-05-20", "name": "Wesak Day", "note": null},
+  {"year": 2027, "date": "2027-06-06", "name": "Awal Muharram", "note": null},
+  {"year": 2027, "date": "2027-06-07", "name": "Agong's Birthday", "note": null},
+  {"year": 2027, "date": "2027-08-15", "name": "Prophet Muhammad's Birthday", "note": null},
+  {"year": 2027, "date": "2027-08-31", "name": "Merdeka Day", "note": null},
+  {"year": 2027, "date": "2027-09-16", "name": "Malaysia Day", "note": null},
+  {"year": 2027, "date": "2027-10-28", "name": "Deepavali", "note": "Not observed in Sarawak"},
+  {"year": 2027, "date": "2027-12-25", "name": "Christmas Day", "note": null}
+]

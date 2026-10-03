@@ -3008,3 +3008,18 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Admin → Payroll (a month with a run) → Reports & export → scroll to Export files.
 - **Expected:** Four rows, each with a name and description (Contribution summary, Bank payment, Full payroll, CP39) and a compact Export button; each opens the share sheet with a file. Header reads the month in words.
 - [ ] Pass
+
+#### R4-01 — Import Malaysian public holidays
+- **Steps:** Admin → Profile → Company calendar → "Add Malaysian public holidays". Check the year chips; untick/tick a few rows; Add.
+- **Expected:** Rows that differ by state start unticked and show their note; "Add N holidays" counts the ticks; after adding, those rows show "Added" and can't be ticked; the holidays appear on the admin and staff calendars; importing again adds nothing twice.
+- [ ] Pass
+
+#### R4-02 — Decline with a reason
+- **Steps:** As an approver tap Decline on a leave, a claim and an overtime request. Type a reason on one, leave another blank. Tap low inside the reason box.
+- **Expected:** A sheet asks "Decline this …?"; the whole box is tappable; Cancel changes nothing. The employee's notification reads "… was declined: {reason}" (or just "was declined." with no reason), and their Leave / Claims / Overtime list shows "Reason: …" under the declined item.
+- [ ] Pass
+
+#### R4-03 — Decline sheet keyboard (Android + iPhone)
+- **Steps:** Open the decline sheet and type a long reason.
+- **Expected:** The keyboard never covers the field or the Decline button; a counter appears in the last 50 characters; 300 is the limit.
+- [ ] Pass

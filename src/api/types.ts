@@ -325,6 +325,8 @@ export type LeaveRequest = {
   reason: string | null;
   status: string;
   statusLabel: string;
+  /** The approver's reason when the request was declined (optional; older servers omit it). */
+  decisionNote?: string | null;
 };
 export type PendingLeave = {
   id: string;
@@ -373,6 +375,8 @@ export type Claim = {
   statusLabel: string;
   /** True when a receipt photo is stored — fetch it via `claimApi.receiptUrl(id)`. */
   hasReceipt: boolean;
+  /** The approver's reason when the claim was declined (optional; older servers omit it). */
+  decisionNote?: string | null;
 };
 export type ClaimSummary = { pendingTotalLabel: string; reimbursedThisMonthLabel: string; claims: Claim[] };
 export type PendingClaim = {
@@ -408,6 +412,8 @@ export type Overtime = {
   reason: string | null;
   status: string;
   statusLabel: string;
+  /** The approver's reason when the request was declined (optional; older servers omit it). */
+  decisionNote?: string | null;
 };
 export type PendingOvertime = {
   id: string;
@@ -702,6 +708,33 @@ export type UpdateCompanyEventBody = {
   eventType?: EventTypeValue;
   timeLabel?: string | null;
 };
+
+/** One suggested Malaysian public holiday from the server's catalogue. */
+export type HolidaySuggestion = {
+  /** ISO date (YYYY-MM-DD). */
+  date: string;
+  name: string;
+  /** Short regional caveat, e.g. "Not observed in Sarawak"; null when it applies nationwide. */
+  note: string | null;
+  /** The company already has a HOLIDAY event on this date. */
+  alreadyAdded: boolean;
+};
+
+/** `GET /api/admin/calendar/holiday-suggestions?year=` — a suggested list the admin reviews. */
+export type HolidaySuggestions = {
+  year: number;
+  /** Plain-language provenance line shown under the list. */
+  source: string;
+  /** Years available in the catalogue. */
+  years: number[];
+  items: HolidaySuggestion[];
+};
+
+export type ImportHolidayItem = { date: string; name: string };
+export type ImportHolidaysResult = { created: number; skipped: number };
+
+/** Optional decline reason sent to the reject endpoints (only when non-empty). */
+export type RejectBody = { reason: string };
 
 // ---- Notifications ----
 export type NotificationItem = {

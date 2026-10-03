@@ -360,13 +360,13 @@ needed. Full details in `backend/README.md`.
 - **Layout:** package-by-feature under `com.teamora` (`auth`, `company`,
   `employee`, `attendance`, `leave`, `claim`, `overtime`, `payroll`, `calendar`,
   `schedule`, `notification`, + `config`, `security`, `common`, `seed`).
-- **Migrations:** currently `V1`–`V20` (init → multi-tenancy & roles →
+- **Migrations:** currently `V1`–`V21` (init → multi-tenancy & roles →
   reporting-manager + single-owner → overtime → schedule → company events →
   notifications → push tokens → employee monthly_salary → tax profile + payslip PCB →
   configurable comp + leave types → work locations → clock-in photo → employee
   statutory/bank → partial-day leave → leave accrual/carry-forward → claim receipt
   photo → QA round 2 (work start time, late grace, override flag, per-company
-  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks).
+  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks → decline reasons).
 - **Wall-clock times are stored as `HH:mm` text** (`common.HhMmConverter`), not SQL
   `TIME` — a `TIME` column goes through the JDBC time-zone conversion and a
   migration default reads back shifted.
@@ -376,6 +376,12 @@ needed. Full details in `backend/README.md`.
   provider chosen yet). `PASSWORD_RESET_EXPOSE_CODE=true` (local dev only, default
   false) returns the code as `devCode`; the app shows the flow only when
   `showInternalHints()` is true, and production keeps "ask your HR admin".
+- **Dates use Malaysian time:** the server runs in UTC, so never call bare
+  `LocalDate.now()` / `YearMonth.now()` — pass `common.Zones.KL`.
+- **Public holidays** come from `resources/holidays/my-public-holidays.json`, offered as
+  a suggestion list (`/api/admin/calendar/holiday-suggestions` → `holiday-import`) that
+  the admin ticks — never auto-inserted (dates differ by state; source isn't the gazette).
+  Add next year's dates to that file each year.
 - **Dev deploy without an image rebuild:** `./scripts/test-backend.sh` builds the
   jar; `docker cp target/teamora-api-1.0.0.jar teamora-api:/app/app.jar && docker
   restart teamora-api` applies new migrations on start.
