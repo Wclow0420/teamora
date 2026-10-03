@@ -35,6 +35,16 @@ public class CompanyService {
         return companies.save(c);
     }
 
+    /** Record that the setup wizard is done; keeps the first completion time. */
+    @Transactional
+    public void completeSetup(Company caller) {
+        // Load a managed copy — the caller's company comes from the security context (detached).
+        Company company = companies.findById(caller.getId()).orElseThrow();
+        if (company.getSetupCompletedAt() == null) {
+            company.setSetupCompletedAt(java.time.Instant.now());
+        }
+    }
+
     @Transactional
     public Company update(Company caller, UpdateCompanyRequest req) {
         // The caller's company comes from the security context, i.e. outside this

@@ -22,13 +22,14 @@ public final class CompanyDtos {
             String address,
             String timezone,
             String currency,
-            boolean active
+            boolean active,
+            java.time.Instant setupCompletedAt
     ) {
         public static CompanyResponse from(Company c) {
             return new CompanyResponse(
                     c.getId(), c.getName(), c.getSlug(), c.getRegistrationNo(), c.getEpfNo(),
                     c.getSocsoNo(), c.getEmail(), c.getPhone(), c.getAddress(),
-                    c.getTimezone(), c.getCurrency(), c.isActive());
+                    c.getTimezone(), c.getCurrency(), c.isActive(), c.getSetupCompletedAt());
         }
     }
 

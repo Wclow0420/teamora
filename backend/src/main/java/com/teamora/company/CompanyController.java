@@ -31,6 +31,14 @@ public class CompanyController {
         return CompanyResponse.from(companyService.update(currentEmployee.require().getCompany(), req));
     }
 
+    /** Mark the first-run setup wizard as finished (idempotent) — owners / HR admins only. */
+    @PostMapping("/me/setup-complete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
+    public void completeSetup() {
+        companyService.completeSetup(currentEmployee.require().getCompany());
+    }
+
     /**
      * Permanently delete the caller's company and all of its data — OWNER only.
      * Body {@code {"password", "confirmName"}}; 400 on a wrong password / name.

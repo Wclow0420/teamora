@@ -50,4 +50,8 @@ public class Company extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active;
+
+    /** When the first-run setup wizard was finished; null until then. */
+    @Column(name = "setup_completed_at")
+    private java.time.Instant setupCompletedAt;
 }

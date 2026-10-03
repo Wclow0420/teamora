@@ -126,6 +126,7 @@ public class EmployeeSeeder implements CommandLineRunner {
                 .currency("MYR")
                 .address(hq)
                 .active(true)
+                .setupCompletedAt(java.time.Instant.now()) // demo companies are already set up
                 .build();
     }
 
