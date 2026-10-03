@@ -92,3 +92,19 @@ Polish fixed: welcome mark's halo was clipped by the screen edge; work-week summ
 Not exercised on screen here: duplicate-email bounce, software-keyboard overlap, the
 site + GPS branch, Share login sheet, Finish later → resume card, Reduce Motion, Android.
 iOS shows its own "Save Password?" sheet after the account step — system behaviour.
+
+## Second hands-on pass
+Verified on the simulator: duplicate email (bounces back to "About you" with the error
+under Work email, other fields kept); × → "Finish later" → dashboard "Finish setting up"
+card → resume at Work week; Skip on holidays (finale shows "Skipped"); office-site branch
+(missing pin error, "Use my current location" with a simulated KL location, site created,
+invited person assigned to it); Share login sheet. Server check: the invited employee is
+refused 5.8 km away ("Move within 200 m") and accepted at the site.
+Fixed: the temporary password was truncated with "…" beside the Share button — it now
+shrinks to fit instead (the owner has to read it out).
+Observed, not changed: iOS shows "Save Password?" when leaving the About-you step
+(system behaviour). Twice the simulator dropped the last typed word ("Kopi Test Co" →
+"Kopi Test") when the next tap came quickly — it did not happen on the first run, so
+it looks like simulator input lag; watch for it on a real phone.
+Still unverified: software keyboard overlap, Reduce Motion, Android.
+Test company deleted afterwards.

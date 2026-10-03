@@ -67,7 +67,14 @@ export function TeamStep({ rows, onChangeRow, onRemoveRow, onAddRow, onShare, bu
             >
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[type.micro, { color: palette.faint }]}>Temporary password</Text>
-                <Text selectable style={[type.bodyStrong, { color: palette.ink, marginTop: 2 }]} numberOfLines={1}>
+                {/* Never truncate: the owner has to read this out. Shrink to fit instead. */}
+                <Text
+                  selectable
+                  style={[type.bodyStrong, { color: palette.ink, marginTop: 2 }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
                   {r.password}
                 </Text>
               </View>
