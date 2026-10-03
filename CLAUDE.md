@@ -95,7 +95,8 @@ app/                         # Expo Router routes (file-based)
   index.tsx                  # Auth gate → redirects by role
   (auth)/                    # Signed-out flow (group, no URL segment)
     onboarding.tsx
-    login.tsx register.tsx   # one login; role decides the app (§7)
+    login.tsx                # one login; role decides the app (§7)
+    setup.tsx                # new-company setup wizard (register.tsx redirects here)
   (staff)/                   # Employee app (group)
     _layout.tsx              # Stack: tabs + pushed detail screens
     (tabs)/                  # Pill bottom-nav tabs
@@ -122,6 +123,8 @@ src/
     layout/                  # Screen frame, AsyncBoundary
     navigation/              # PillTabBar (custom tab bar)
     approvals/               # Approval cards (leave/claim/overtime)
+    wizard/                  # Wizard kit: Wizard, WizardCelebration, motion presets
+  features/                  # Multi-step flows (steps hook + step bodies), e.g. setup/
   context/                   # React contexts (AuthContext)
   hooks/                     # Reusable hooks (useLiveTimer, useAuth re-export)
   lib/                       # Framework-agnostic helpers (payslip PDF: expo-print)
@@ -206,7 +209,21 @@ Import from the barrel: `import { Button, Card, Chip, ... } from '@/components/u
 | `DateField`    | Tap-to-pick date row (native picker). Used in submit forms.    |
 | `PointList`    | Icon + text bullet rows in a card (legal, "what happens" lists). |
 | `MonthStepper` | ‹ Month › header control for month-scoped screens.             |
+| `Stepper`      | − value + row for small bounded numbers (hours, leave days, radius). `min`/`max`/`step` (halves OK), `format`, tabular numerals, hold-to-repeat, VoiceOver adjustable. |
+| `ChoiceTile`   | Big tappable option card (icon + title + one line + check) for "pick one" questions; `mode="checkbox"` for multi-select. |
+| `CheckBox`     | Visual tick box for list rows (the row's `Pressable` carries the checkbox role). |
 | `AsyncBoundary`| (in `layout/`) Gates a data section on a query's loading/error, with retry. |
+| `Wizard`       | (in `wizard/`) One-decision-per-screen flow: fixed header (back · springing progress bar · Skip), sliding/staggered steps, pinned primary button with spinner + inline error. Steps are data (`WizardStep[]`) — API documented at the top of `Wizard.tsx`. Honours Reduce Motion. The **only** place allowed its own `KeyboardAvoidingView` (pinned footer). |
+| `WizardCelebration` | (in `wizard/`) Finale for a `bare` wizard step: springing coral check that draws itself, a soft burst, then a checklist (`items: { label, done, detail? }[]`) ticking in. |
+
+`Button` also takes `loading` (spinner, ignores presses) for async actions.
+
+**Wizard flows** live in `src/features/<flow>/` (steps hook + one body component per
+step); routes stay thin. Example: `src/features/setup/` — the new-company setup, rendered by
+`app/(auth)/setup.tsx` (signed out; signs up at step 3 and keeps going) and
+`app/admin/setup.tsx` (owner resuming from the dashboard's "Finish setting up" card).
+Motion presets (springs, stagger, step enter/exit) are in `src/components/wizard/motion.ts`
+— reuse them rather than inventing new timings.
 
 **Adding a component:** put presentational components in `ui/`, give it a typed
 props object, theme every value, export it, and add it to `ui/index.ts`. Prefer

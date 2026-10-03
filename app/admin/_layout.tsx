@@ -43,6 +43,8 @@ export default function AdminLayout() {
       <Stack.Screen name="calendar-events" />
       <Stack.Screen name="calendar-event-edit" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="holiday-import" />
+      {/* Guided setup (resume): the wizard owns Back, so no swipe-to-dismiss. */}
+      <Stack.Screen name="setup" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
     </Stack>
   );
 }

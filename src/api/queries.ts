@@ -442,6 +442,15 @@ export function useDeleteCompany() {
   return useMutation({ mutationFn: (body: DeleteCompanyBody) => companyApi.remove(body) });
 }
 
+/** OWNER: the guided setup is done — hides the dashboard's "Finish setting up" card. */
+export function useCompleteCompanySetup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => companyApi.completeSetup(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['company'] }),
+  });
+}
+
 export function useUpdateCompany() {
   const qc = useQueryClient();
   return useMutation({

@@ -28,7 +28,22 @@ type AuthState = {
   employee: EmployeeResponse | null;
   role: Role | null;
   signIn: (email: string, password: string) => Promise<EmployeeResponse>;
-  signUp: (companyName: string, fullName: string, email: string, password: string) => Promise<EmployeeResponse>;
+  /**
+   * Create a company + its owner and sign in. Like `signIn`, this only flips
+   * `status` — it never navigates. Nothing in the app redirects on a status
+   * change (the role redirect in `app/index.tsx` only renders at "/", and the
+   * admin layout's guard isn't mounted under `(auth)`), which is what lets the
+   * setup wizard call this mid-flow and simply carry on to its next step.
+   * `deferPush` skips the notification-permission prompt so it doesn't interrupt
+   * the wizard; the caller registers for push when the flow ends.
+   */
+  signUp: (
+    companyName: string,
+    fullName: string,
+    email: string,
+    password: string,
+    options?: { deferPush?: boolean },
+  ) => Promise<EmployeeResponse>;
   signOut: () => Promise<void>;
   /** Re-attempt the session restore after an `offline` launch. */
   retryRestore: () => Promise<void>;
@@ -131,15 +146,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.employee;
   }, []);
 
-  const signUp = useCallback(async (companyName: string, fullName: string, email: string, password: string) => {
-    const res = await authApi.register({ companyName, fullName, email: email.trim(), password });
-    queryClient.clear(); // never inherit a previous account's cache
-    await saveTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
-    setEmployee(res.employee);
-    setStatus('authenticated');
-    void registerPushToken();
-    return res.employee;
-  }, []);
+  const signUp = useCallback(
+    async (companyName: string, fullName: string, email: string, password: string, options?: { deferPush?: boolean }) => {
+      const res = await authApi.register({ companyName, fullName, email: email.trim(), password });
+      queryClient.clear(); // never inherit a previous account's cache
+      await saveTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
+      setEmployee(res.employee);
+      setStatus('authenticated');
+      if (!options?.deferPush) void registerPushToken();
+      return res.employee;
+    },
+    [],
+  );
 
   const value = useMemo<AuthState>(
     () => ({

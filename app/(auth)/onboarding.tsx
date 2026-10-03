@@ -56,7 +56,7 @@ export default function Onboarding() {
       </View>
 
       <View style={{ marginTop: 28 }}>
-        <Button label="Get started" icon="arrowR" iconTrailing height={54} onPress={() => router.push('/login')} />
+        <Button label="Get started" icon="arrowR" iconTrailing height={54} onPress={() => router.push('/setup')} />
         <Text
           style={[font(600), { fontSize: 13, color: palette.soft, textAlign: 'center', marginTop: 14 }]}
           onPress={() => router.push('/login')}

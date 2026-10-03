@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View, ViewStyle, StyleProp, GestureResponderEvent } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View, ViewStyle, StyleProp, GestureResponderEvent } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { palette, radius, font, shadows } from '@/theme';
 import { Icon, IconName } from './Icon';
@@ -17,6 +17,8 @@ type Props = {
   block?: boolean;
   height?: number;
   disabled?: boolean;
+  /** Show a spinner in place of the icon and ignore presses (async work in flight). */
+  loading?: boolean;
   /** Fire a light haptic on press. Default true. */
   haptic?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -53,13 +55,15 @@ export function Button({
   block = true,
   height = 52,
   disabled = false,
+  loading = false,
   haptic = true,
   style,
 }: Props) {
   const s = SKINS[variant];
+  const inert = disabled || loading;
 
   const handlePress = (e: GestureResponderEvent) => {
-    if (disabled) return;
+    if (inert) return;
     if (haptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onPress?.(e);
   };
@@ -67,10 +71,10 @@ export function Button({
   return (
     <Pressable
       onPress={handlePress}
-      disabled={disabled}
+      disabled={inert}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: inert, busy: loading }}
       style={block ? { width: '100%' } : undefined}
     >
       {({ pressed }) => (
@@ -94,11 +98,12 @@ export function Button({
             style,
           ]}
         >
-          {icon && !iconTrailing && <Icon name={icon} size={19} color={s.fg} stroke={2.2} />}
+          {loading && <ActivityIndicator size="small" color={s.fg} />}
+          {icon && !iconTrailing && !loading && <Icon name={icon} size={19} color={s.fg} stroke={2.2} />}
           <Text style={[font(700), { fontSize: 15, letterSpacing: -0.2, color: s.fg }]} numberOfLines={1}>
             {label}
           </Text>
-          {icon && iconTrailing && <Icon name={icon} size={19} color={s.fg} stroke={2.2} />}
+          {icon && iconTrailing && !loading && <Icon name={icon} size={19} color={s.fg} stroke={2.2} />}
         </View>
       )}
     </Pressable>

@@ -26,3 +26,6 @@ export { MonthStepper } from './MonthStepper';
 export { DecisionNote } from './DecisionNote';
 export { PointList } from './PointList';
 export type { Point } from './PointList';
+export { Stepper } from './Stepper';
+export { ChoiceTile } from './ChoiceTile';
+export { CheckBox } from './CheckBox';

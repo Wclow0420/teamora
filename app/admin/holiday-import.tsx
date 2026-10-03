@@ -4,52 +4,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/components/layout/Screen';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
-import { Button, Card, Chip, EmptyState, Icon, ScreenHeader, SelectChips, type SelectOption } from '@/components/ui';
+import { Button, Card, CheckBox, Chip, EmptyState, ScreenHeader, SelectChips, type SelectOption } from '@/components/ui';
 import { useHolidaySuggestions, useImportHolidays } from '@/api/queries';
-import type { HolidaySuggestion } from '@/api/types';
 import { alertError } from '@/lib/errors';
+import { defaultHolidayTicks, holidayDateLabel } from '@/lib/holidays';
 import { palette, font, radius, spacing, tint } from '@/theme';
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** "2027-02-06" → "Sat, 6 Feb" (the raw value if it can't parse). */
-function dateLabel(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  const date = new Date(y, m - 1, d);
-  return `${WEEKDAYS[date.getDay()]}, ${d} ${MONTHS[m - 1]}`;
-}
 
 /** From October on, admins are usually planning next year. */
 function preferredYear(now: Date = new Date()): number {
   return now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
-}
-
-/** Ticked by default: nationwide holidays not yet on the calendar. Regional ones are the admin's call. */
-function defaultTicks(items: HolidaySuggestion[]): string[] {
-  return items.filter((h) => !h.alreadyAdded && !h.note).map((h) => h.date);
-}
-
-/** Tick box for a suggestion row. */
-function CheckBox({ checked, disabled }: { checked: boolean; disabled: boolean }) {
-  const on = checked && !disabled;
-  return (
-    <View
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: radius.sm - 2,
-        borderWidth: on ? 0 : 1.5,
-        borderColor: palette.line,
-        backgroundColor: on ? palette.coral : disabled ? palette.surfaceSunken : palette.surface,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {on && <Icon name="check" size={14} color={palette.white} stroke={2.6} />}
-    </View>
-  );
 }
 
 /**
@@ -85,7 +48,7 @@ export default function HolidayImport() {
 
   useEffect(() => {
     if (!q.data || (q.data.year ?? year) !== year || ticks[year]) return;
-    setTicks((t) => ({ ...t, [year]: defaultTicks(items) }));
+    setTicks((t) => ({ ...t, [year]: defaultHolidayTicks(items) }));
   }, [q.data, items, year, ticks]);
 
   const selected = new Set(ticks[year] ?? []);
@@ -171,7 +134,7 @@ export default function HolidayImport() {
                         onPress={() => toggle(h.date)}
                         disabled={h.alreadyAdded}
                         accessibilityRole="checkbox"
-                        accessibilityLabel={`${h.name}, ${dateLabel(h.date)}`}
+                        accessibilityLabel={`${h.name}, ${holidayDateLabel(h.date)}`}
                         accessibilityState={{ checked, disabled: h.alreadyAdded }}
                         style={({ pressed }) => ({
                           flexDirection: 'row',
@@ -193,7 +156,7 @@ export default function HolidayImport() {
                               { fontSize: 11.5, lineHeight: 16, color: palette.soft, marginTop: 2, fontVariant: ['tabular-nums'] },
                             ]}
                           >
-                            {dateLabel(h.date)}
+                            {holidayDateLabel(h.date)}
                           </Text>
                           {!!h.note && (
                             <Text style={[font(500), { fontSize: 11, lineHeight: 15, color: palette.faint, marginTop: 3 }]}>

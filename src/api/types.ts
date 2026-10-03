@@ -544,6 +544,12 @@ export type CompanyResponse = {
   timezone: string;
   currency: string;
   active: boolean;
+  /**
+   * When the owner finished the guided setup (ISO instant). `null` = a new
+   * company that hasn't finished it yet (the dashboard offers "Finish setting
+   * up"); absent = an older server — treat as finished.
+   */
+  setupCompletedAt?: string | null;
 };
 export type UpdateCompanyBody = {
   name?: string;

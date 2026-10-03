@@ -51,12 +51,16 @@ export function scheduledWorkingDays(mask: number, year: number, month0: number)
   return count;
 }
 
-/** Short human summary of a mask, e.g. "Mon–Fri", "Every day", or "Mon, Wed, Fri". */
+/** Short human summary of a mask, e.g. "Mon–Fri", "Mon–Sat", "Every day", or "Mon, Wed, Fri". */
 export function describeMask(mask: number): string {
   if (mask === FULL_WEEK_MASK) return 'Every day';
   if (mask === WEEKDAYS_MASK) return 'Mon–Fri';
-  const on = WEEKDAYS.filter((w) => isBitSet(mask, w.bit)).map((w) => w.short);
-  return on.length ? on.join(', ') : 'No working days';
+  const on = WEEKDAYS.filter((w) => isBitSet(mask, w.bit));
+  if (on.length === 0) return 'No working days';
+  // A single unbroken run of 3+ days reads better as a range: "Mon–Sat".
+  const contiguous = on.every((w, i) => i === 0 || w.bit === on[i - 1].bit + 1);
+  if (contiguous && on.length >= 3) return `${on[0].short}–${on[on.length - 1].short}`;
+  return on.map((w) => w.short).join(', ');
 }
 
 /**

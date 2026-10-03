@@ -113,6 +113,8 @@ export const companyApi = {
   update: (body: UpdateCompanyBody) => api.patch<CompanyResponse>('/api/companies/me', body),
   /** OWNER only. Permanently erases the company and every row that belongs to it (→ 204). */
   remove: (body: DeleteCompanyBody) => api.post<void>('/api/companies/me/delete', body),
+  /** OWNER: mark the guided company setup as finished (→ 204). Idempotent. */
+  completeSetup: () => api.post<void>('/api/companies/me/setup-complete'),
 };
 
 export const companySettingsApi = {

@@ -159,15 +159,15 @@ Pass type: Smoke / Full           Result: PASS / FAIL (list IDs)
 - [ ] Pass
 - Account: none
 - Pre: signed out
-- Steps: 1. Read the brand row on Onboarding. 2. Tap **Get started** and read the brand row on Login. 3. Tap **Create an account** and read the brand row on Register. 4. Read the legal line at the bottom of Login.
+- Steps: 1. Read the brand row on Onboarding. 2. Tap **I already have an account** and read the brand row on Login. 3. Tap **Create an account** and read the title of the setup wizard's first screen ("Welcome to Teamora"). 4. Read the legal line at the bottom of Login.
 - Expect: the wordmark reads **Teamora** on all three screens. The word "lumi" / "Lumi" never appears as the product name (including the "Terms & Privacy" line).
 
 #### AUTH-03 — Onboarding navigation: Skip, Get started, I already have an account
 - [ ] Pass
 - Account: none
 - Pre: on Onboarding
-- Steps: 1. Tap **Skip** → then **Back**. 2. Tap **Get started** → then **Back**. 3. Tap **I already have an account**.
-- Expect: each of the three controls opens the Login screen; **Back** returns to Onboarding.
+- Steps: 1. Tap **Skip** → then **Back**. 2. Tap **Get started** → then × (top left). 3. Tap **I already have an account**.
+- Expect: **Skip** and **I already have an account** open the Login screen; **Get started** opens the new-company setup wizard ("Welcome to Teamora"). Back / × return to Onboarding.
 
 #### AUTH-04 — Onboarding makes no false promise
 - [ ] Pass
@@ -262,35 +262,103 @@ Pass type: Smoke / Full           Result: PASS / FAIL (list IDs)
 - Steps: 1. Type in **Password**. 2. Tap **Back**.
 - Expect: characters are masked; no auto-capitalise / auto-correct on either field; Back returns to Onboarding.
 
-### A.3 Register a new company (`app/(auth)/register.tsx`)
+### A.3 New-company setup wizard (`app/(auth)/setup.tsx`, `app/admin/setup.tsx`, `src/features/setup/`, `src/components/wizard/`)
 
-#### AUTH-17 — Register creates a company and signs in as its owner
+Run AUTH-17 → SETUP-09 in order on a clean install; they walk the wizard once, start to finish.
+Throughout, watch the motion: each step drifts in from the right (Back: from the left), the icon
+pops, title → subtitle → body follow ~70 ms apart, the progress bar springs. Nothing should jump,
+flash white, or overlap the old step for more than a blink.
+
+#### AUTH-17 — The wizard creates a company, signs in as its owner, and keeps going
 - [ ] Pass
-- Account: new — e.g. company `QA Bakery`, name `Qa Owner`, email `qa+<timestamp>@example.com`, password `password`
-- Pre: on Login
-- Steps: 1. Tap **New company? Create an account**. 2. Fill **Company name**, **Your name**, **Work email**, **Password**. 3. Tap **Create company**.
-- Expect: button reads "Creating…"; then the admin Dashboard opens with subtitle "· Owner". KPIs are real zeros ("0 /1 present", "0 on leave", "0 approvals", "RM 0.00 payroll due"), "No activity yet", and the chart is empty — nothing invented.
+- Account: new — company `QA Bakery`, name `Qa Owner`, email `qa+<timestamp>@example.com`, password `password`
+- Pre: signed out, on Onboarding
+- Steps: 1. Tap **Get started**. 2. On "Welcome to Teamora" tap **Get started**. 3. "First, about you": fill **Full name**, **Work email**, **Password** → **Continue**. 4. "Your company": fill **Company name**, leave SSM empty → **Create company**.
+- Expect: the button shows a spinner, then the wizard moves on to **"Your work week"** — it does **not** jump to the Dashboard. The header shows a close (×) button instead of Back: steps 1–3 can't be revisited. Server: `POST /api/auth/login` with the new email works; `GET /api/companies/me` shows `setupCompletedAt: null`.
 
-#### AUTH-18 — Any empty field blocks submission
+#### AUTH-18 — Empty / invalid fields are caught on the step, in place
 - [ ] Pass
 - Account: none
-- Pre: on "Create your company"
-- Steps: 1. Leave each field empty in turn and tap **Create company**.
-- Expect: "Please fill in all fields." every time; no request is sent.
+- Pre: on "First, about you"
+- Steps: 1. Tap **Continue** with everything empty. 2. Enter name, email `not-an-email`, password `short` → **Continue**. 3. Fix them → **Continue**; on "Your company" tap **Create company** with the name empty.
+- Expect: 1. "Enter your name." / "Enter your work email." / "Use at least 8 characters." under the fields. 2. "That doesn't look like an email address." and the password rule. 3. "Enter your company name." No request is sent in any of these; an error clears as soon as its field is edited.
 
-#### AUTH-19 — Duplicate email is rejected
+#### AUTH-19 — Duplicate email sends you back to the email field
 - [ ] Pass
 - Account: use `amir@lumi.com`
-- Pre: on "Create your company"
-- Steps: 1. Fill all fields with an existing email. 2. Tap **Create company**.
-- Expect: red message "An account with this email already exists"; stays on the form with values kept.
+- Pre: on "Your company" with an existing email entered on the previous step
+- Steps: 1. Tap **Create company**.
+- Expect: the wizard slides **back** to "First, about you" with "An account with this email already exists. Use a different email, or sign in instead." under **Work email**; name and password are kept. Changing the email and continuing creates the company.
 
-#### AUTH-20 — Invalid email format is rejected
+#### AUTH-20 — Leaving before the account exists
 - [ ] Pass
-- Account: email `not-an-email`
-- Pre: on "Create your company"
-- Steps: 1. Submit.
-- Expect: a red validation message; no company is created (confirm you cannot then sign in with it).
+- Account: none
+- Pre: on "Welcome to Teamora"
+- Steps: 1. Tap **Sign in** in "Already use Teamora? Sign in". 2. Back on Login tap **Create an account**, go to "Your company", tap Back twice, then × on Welcome.
+- Expect: 1. Login opens. 2. Back walks step by step (typed values kept); × returns to the previous screen. The iOS edge-swipe does **not** pop the wizard. `/register` (old link) redirects to the wizard.
+
+#### SETUP-01 — Work week saves and prefills
+- [ ] Pass
+- Account: the owner from AUTH-17
+- Pre: on "Your work week"
+- Steps: 1. Confirm Mon–Fri, **8 h**, **9:00 AM**, **5 min** are prefilled. 2. Untick every day. 3. Tick Mon–Sat, set hours to 8.5 (tap +), hold **+** on "Late after" to run it up, set 15 → **Continue**.
+- Expect: 2. "Pick at least one working day." and Continue disabled. 3. Stepper numbers pop, stop at min/max (buttons dim), holding repeats and releasing adds no extra step. Server: `GET /api/admin/company-settings` → `defaultWorkingDays: 63`, `defaultHoursPerDay: 8.5`, `workStartTime: "09:00"`, `lateGraceMinutes: 15`.
+
+#### SETUP-02 — Leave entitlements
+- [ ] Pass
+- Account: same
+- Pre: on "Leave your team gets"
+- Steps: 1. Read the list. 2. Set Annual Leave to 12 → **Continue**. 3. Tap Back, then Back again, then forward twice.
+- Expect: 1. Annual 16, Medical 14, Emergency 5 (each "Paid · days a year"); the note names the Employment Act minimums and says "Unpaid Leave has no yearly limit." 2. Server: `GET /api/admin/leave/types` → Annual `defaultEntitlementDays: 12`, others unchanged. 3. Values are kept in both directions; from Leave, Back reaches Work week but never the account steps.
+
+#### SETUP-03 — Public holidays (suggested, never automatic)
+- [ ] Pass
+- Account: same
+- Pre: on "Public holidays" (run in Oct–Dec to see both groups)
+- Steps: 1. Read the list. 2. Untick one nationwide holiday, tick one state-specific one. 3. Tap **Add N holidays**. 4. Tap Back from the next step.
+- Expect: 1. "REST OF <year>" shows only dates from today on, then "<next year>"; nationwide rows are ticked, state-specific rows are unticked with their note. The button counts the ticks. 3. Moves on; Company calendar shows exactly the ticked holidays. 4. Those rows now show an "Added" chip and can't be ticked. **Skip** instead adds nothing.
+
+#### SETUP-04 — Workplace: one site (real phone for GPS)
+- [ ] Pass
+- Account: same
+- Pre: on "Where does your team clock in?"
+- Steps: 1. Continue is disabled until a tile is chosen. 2. Tap **One office or site** → **Continue** with nothing filled. 3. Type a site name, tap **Use my current location** (allow), set radius to 300 → **Continue**.
+- Expect: 2. "Give the site a name." and the location card outlined red with its message. 3. "Location captured" with coordinates; the line reads "Staff must be within 300 m to clock in."; the name field stays visible above the keyboard and the button rides above it. Server: `GET /api/admin/work-locations` → one active site, `radiusM: 300`. Denying the permission shows "Location permission is off…".
+
+#### SETUP-05 — Workplace: anywhere / changing your mind
+- [ ] Pass
+- Account: same
+- Pre: SETUP-04 done, on "Invite your team"
+- Steps: 1. Tap Back, choose **Anywhere** → **Continue**. 2. Back again, choose **One office or site** → **Continue**.
+- Expect: 1. the site is switched to inactive (not duplicated). 2. the same site is active again — still exactly one row in Work locations.
+
+#### SETUP-06 — Invite your team and share logins
+- [ ] Pass
+- Account: same
+- Pre: on "Invite your team"
+- Steps: 1. Enter a name with email `bad`, tap **Add another**, enter a valid person as Manager → **Add 2 people**. 2. Fix the email → **Add 2 people**. 3. Add one with `amir@lumi.com`. 4. Tap **Share login** on a created person. 5. **Continue**.
+- Expect: 1. "Enter a valid work email." on that card; nothing is created. 2. Both cards turn into summaries with a tick, role · email, a readable **Temporary password** (like `Kopi-4821-teh`) and **Share login**; the button now reads **Continue**. 3. That card shows "An account with this email already exists" and can be removed with ×. 4. The share sheet text names the person, the company, the email and the temporary password, and ends "You can change it in Profile → Change password." 5. Staff tab later lists them; each can sign in with the shared password; with a site set in SETUP-04 they are assigned to it.
+
+#### SETUP-07 — Finale
+- [ ] Pass
+- Account: same
+- Pre: on the last step
+- Steps: 1. Watch it arrive. 2. Read the checklist. 3. Tap **Go to dashboard**.
+- Expect: 1. a coral circle springs in, its tick draws, a soft burst of dots and rings fades out, a success haptic, then "You're all set" and the rows appear one by one. 2. Rows match what was really done ("12 added", the site name or "Anywhere", "2 invited"; skipped steps say "Skipped" with a dash). 3. Dashboard opens with **no** "Finish setting up" card; `GET /api/companies/me` → `setupCompletedAt` set. On a real device the notification-permission prompt appears now, not mid-wizard.
+
+#### SETUP-08 — Finish later, then resume from the dashboard
+- [ ] Pass
+- Account: a second new owner (repeat AUTH-17)
+- Pre: on "Your work week" right after creating the company
+- Steps: 1. Tap × → **Keep going**; × again → **Finish later**. 2. On the Dashboard tap **Continue setup**. 3. Tap × on the first step. 4. Force-quit, reopen. 5. Finish the wizard.
+- Expect: 1. the alert explains progress is saved; Finish later opens the Dashboard with the "Finish setting up your company" card on top. 2. the wizard opens at **Your work week** (no welcome/account steps) with saved values prefilled. 3. back on the Dashboard, card still there. 4. still signed in, card still there. 5. card gone for good. An HR Admin of the same company never sees the card.
+
+#### SETUP-09 — Errors and Reduce Motion
+- [ ] Pass
+- Account: any owner mid-wizard
+- Pre: —
+- Steps: 1. Stop the API (or go offline) and tap **Continue** on Work week. 2. Restore, tap again. 3. Settings → Accessibility → Motion → **Reduce Motion** on, reopen the wizard and step through to the finale.
+- Expect: 1. a red note above the button: "Can't reach Teamora. Check your connection and try again."; the step stays, nothing is lost. 2. it proceeds. 3. steps crossfade with no sliding or scaling; the finale fades in with no burst.
 
 #### AUTH-21 — A new company starts with the default leave catalogue and is isolated
 - [ ] Pass

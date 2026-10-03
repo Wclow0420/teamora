@@ -135,7 +135,7 @@ export default function Login() {
         <Button label={submitting ? 'Signing in…' : 'Sign in'} icon="arrowR" iconTrailing height={54} disabled={submitting} onPress={onSubmit} />
       </View>
 
-      <Pressable onPress={() => router.push('/register')} accessibilityRole="button" style={{ marginTop: 18, alignItems: 'center' }}>
+      <Pressable onPress={() => router.push('/setup')} accessibilityRole="button" style={{ marginTop: 18, alignItems: 'center' }}>
         <Text style={[font(600), { fontSize: 13, color: palette.soft }]}>
           New company? <Text style={[font(700), { color: palette.coral }]}>Create an account</Text>
         </Text>

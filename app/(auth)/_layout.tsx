@@ -8,6 +8,8 @@ export default function AuthLayout() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
+      {/* Setup wizard: Back is the wizard's own (step by step); a swipe must not drop out mid-flow. */}
+      <Stack.Screen name="setup" options={{ gestureEnabled: false }} />
       <Stack.Screen name="forgot-password" />
       {/* legal — also pushed from both Profile screens while signed in */}
       <Stack.Screen name="privacy" />

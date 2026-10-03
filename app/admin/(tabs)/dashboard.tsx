@@ -6,7 +6,8 @@ import { Avatar, BarChart, Card, Chip, Icon, IconTile, SectionLabel } from '@/co
 import type { IconName } from '@/components/ui';
 import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { useDashboard, useMe } from '@/api/queries';
+import { FinishSetupCard } from '@/features/setup/FinishSetupCard';
+import { useCompany, useDashboard, useMe } from '@/api/queries';
 import { accentFromKey } from '@/api/accents';
 import type { DashboardSummary, Role } from '@/api/types';
 import { palette, font, radius, gradients, tint } from '@/theme';
@@ -50,6 +51,10 @@ export default function Dashboard() {
   const router = useRouter();
   const me = useMe();
   const dash = useDashboard();
+  const company = useCompany();
+  // A brand-new company's owner who left the guided setup early. Strictly `null`:
+  // an older server doesn't send the field, and that must not nag everyone.
+  const needsSetup = me.data?.role === 'OWNER' && company.data?.setupCompletedAt === null;
 
   const now = new Date();
   const firstName = me.data?.fullName.split(' ')[0] ?? '·';
@@ -86,6 +91,8 @@ export default function Dashboard() {
         </View>
       }
     >
+      {needsSetup && <FinishSetupCard onPress={() => router.push('/admin/setup')} />}
+
       <AsyncBoundary loading={dash.isLoading} error={dash.error} onRetry={dash.refetch}>
         {d && (
           <>
