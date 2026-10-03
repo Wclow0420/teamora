@@ -39,3 +39,22 @@ screen, anything needing a camera or real GPS.
 
 ## Dev data changed
 October 2026 payroll run created (draft); Amir's 22 Jun emergency leave declined.
+
+## Pass 3 — save flows (same day)
+- **Company profile edits were never saved (since day one).** `CompanyService.update`
+  mutated the caller's company taken from the security context — a detached entity with
+  `open-in-view: false` — so the PATCH echoed the change but nothing was flushed.
+  It now loads a managed copy; the IT reads the value back with a fresh GET.
+- **Add employee had no start date**, so mid-year hires got a full-year entitlement
+  (16 days instead of 4 in October). The form now has "Start date" (default today). The
+  API's "no join date = no proration" rule is unchanged (tests rely on it).
+- Temporary password on Add employee was masked → iOS offered to save it to the
+  *admin's* keychain. Now plain text, like Reset password.
+- Leave entitlement: "3.50" vs 3.5 counted as a change (and would have set an override
+  flag); untracked types (Unpaid) are hidden; wording now explains proration + overrides.
+- Employee hub Profile tile said "Not set" when only staff ID / phone existed.
+Verified on screen: add employee (validation + success → hub), Profile save incl.
+duplicate staff ID error, Employment save (manager + work location), join-date
+re-proration (16 → 4), Statutory & bank save, Compensation save (override shown),
+Leave entitlement override (flag set only on the changed type).
+Dev data: test employee "QA Tester" (qa.tester@lumi.com) created; Lumi company phone set.

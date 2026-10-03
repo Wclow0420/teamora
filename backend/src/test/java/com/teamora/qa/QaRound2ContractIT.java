@@ -337,6 +337,11 @@ class QaRound2ContractIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("QA " + slug))
                 .andExpect(jsonPath("$.phone").value("03-1234 5678"));
+        // ...and it is actually stored: a fresh read returns it (the PATCH response
+        // alone once echoed an edit that was never written).
+        mvc.perform(get("/api/companies/me").header("Authorization", bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").value("03-1234 5678"));
     }
 
     @Test

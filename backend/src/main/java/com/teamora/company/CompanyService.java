@@ -29,7 +29,10 @@ public class CompanyService {
     }
 
     @Transactional
-    public Company update(Company company, UpdateCompanyRequest req) {
+    public Company update(Company caller, UpdateCompanyRequest req) {
+        // The caller's company comes from the security context, i.e. outside this
+        // transaction — editing it in place is never flushed. Load a managed copy.
+        Company company = companies.findById(caller.getId()).orElseThrow();
         if (req.name() != null) {
             if (req.name().isBlank()) {
                 throw new BadRequestException("Company name can't be blank");

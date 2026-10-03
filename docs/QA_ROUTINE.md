@@ -3023,3 +3023,22 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Open the decline sheet and type a long reason.
 - **Expected:** The keyboard never covers the field or the Decline button; a counter appears in the last 50 characters; 300 is the limit.
 - [ ] Pass
+
+---
+
+## K. Simulator pass 3 (added 3 Oct 2026)
+
+#### R5-01 — Company profile edits are saved
+- **Steps:** Admin → Company settings → change Phone (and any other profile field) → Save changes. Leave the screen, reopen Company settings.
+- **Expected:** The new values are still there after reopening (and after an app restart).
+- [ ] Pass
+
+#### R5-02 — Add employee with a start date
+- **Steps:** Admin → Staff → Add employee. Fill name, email, an 8+ character temporary password; leave Start date as today; Add. Open Leave entitlement.
+- **Expected:** The temporary password is readable as you type (not masked) and iOS does not offer to save it. Entitlements are prorated from today (e.g. Annual 16 → about 4 in October). The Profile tile shows staff ID / phone when there is no job title.
+- [ ] Pass
+
+#### R5-03 — Leave entitlement override
+- **Steps:** Employee → Leave entitlement. Retype a value as-is (e.g. "3.50" for 3.5) → Save is still disabled. Change one value → Save. Change the employee's join date afterwards.
+- **Expected:** Only real changes enable Save; Unpaid Leave isn't listed; the value you set survives the join-date change while the other types re-prorate.
+- [ ] Pass

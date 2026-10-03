@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/layout/Screen';
-import { ScreenHeader, Button, TextField, SelectChips, type SelectOption } from '@/components/ui';
+import { ScreenHeader, Button, TextField, SelectChips, DateField, toISODate, type SelectOption } from '@/components/ui';
 import { useCreateEmployee } from '@/api/queries';
 import { ApiError } from '@/api/client';
 import { PASSWORD_HELPER, passwordError } from '@/lib/password';
@@ -32,6 +32,8 @@ export default function EmployeeNew() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<NewRole>('EMPLOYEE');
   const [jobTitle, setJobTitle] = useState('');
+  // Defaults to today so a mid-year hire's leave is prorated from the start.
+  const [startDate, setStartDate] = useState<Date>(() => new Date());
   const [error, setError] = useState<string | null>(null);
   const [passwordFieldError, setPasswordFieldError] = useState<string | null>(null);
 
@@ -55,6 +57,7 @@ export default function EmployeeNew() {
         password,
         role,
         jobTitle: jobTitle.trim() || undefined,
+        joinDate: toISODate(startDate),
       });
       // Straight into the new employee's hub so the rest can be filled in from
       // the tiles — replace, so Back returns to the staff list, not this form.
@@ -91,7 +94,9 @@ export default function EmployeeNew() {
           icon="lock"
           value={password}
           onChangeText={setPassword}
-          secure
+          // Shown in clear text (like Reset password): the admin has to read it out
+          // to the new hire, and a masked field next to an email makes iOS offer to
+          // save it into the *admin's* own keychain.
           autoCapitalize="none"
           helper={PASSWORD_HELPER}
           error={passwordFieldError}
@@ -103,6 +108,12 @@ export default function EmployeeNew() {
           onChangeText={setJobTitle}
           placeholder="e.g. Sales Executive"
         />
+        <View>
+          <DateField label="Start date" value={startDate} onChange={setStartDate} />
+          <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: 6, lineHeight: 16 }]}>
+            First-year leave is prorated from this date.
+          </Text>
+        </View>
 
         {error && <Text style={[font(600), { fontSize: 12.5, color: palette.danger }]}>{error}</Text>}
 

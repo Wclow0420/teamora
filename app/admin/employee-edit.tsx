@@ -41,7 +41,9 @@ type Category = {
 
 /** "Sales Executive · Retail" */
 function profileSummary(e: EmployeeResponse): string | null {
-  return summaryLine([e.jobTitle, e.department]);
+  // Title + department first; fall back to the other profile facts so a
+  // profile with only a staff ID or phone doesn't read "Not set".
+  return summaryLine([e.jobTitle, e.department]) ?? summaryLine([e.staffId, e.phone]);
 }
 
 /** "Employee · Nadia Rahman" */

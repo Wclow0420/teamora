@@ -55,14 +55,18 @@ export function LeaveEntitlementFields({ employeeId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const rows = balances.data ?? [];
+  // Untracked types (accrual NONE, e.g. unpaid leave) have no entitlement to set.
+  const rows = (balances.data ?? []).filter((b) => b.accrual !== 'NONE');
   // Nothing to edit (still loading, failed, or no leave types) → show nothing.
   if (rows.length === 0) return null;
 
   const valueFor = (b: LeaveBalance): string => edits[b.leaveTypeId] ?? formatDecimal(num(b.entitled));
   const dirtyRows = rows.filter((b) => {
     const typed = edits[b.leaveTypeId];
-    return typed !== undefined && typed.trim() !== formatDecimal(num(b.entitled));
+    if (typed === undefined) return false;
+    // Compare as numbers so "3.50" vs 3.5 isn't a change (and isn't saved as an override).
+    const n = Number(typed.trim());
+    return typed.trim() === '' || !Number.isFinite(n) || n !== num(b.entitled);
   });
 
   const leaveYear = rows.find((b) => Number.isInteger(b.leaveYear))?.leaveYear;
@@ -98,8 +102,8 @@ export function LeaveEntitlementFields({ employeeId }: Props) {
     <View style={{ gap: 12, marginTop: 4 }}>
       <Text style={[font(700), { fontSize: 13, color: palette.ink }]}>Leave entitlement</Text>
       <Text style={[font(500), { fontSize: 11.5, color: palette.faint, marginTop: -8, lineHeight: 16 }]}>
-        Full-year entitlement{leaveYear ? ` for the ${leaveYear} leave year` : ''}. Accrual and carried-over days
-        are applied on top of this.
+        Entitlement{leaveYear ? ` for the ${leaveYear} leave year` : ''}, prorated from the join date. A value you
+        change here is kept as set. Accrual and carried-over days are applied on top.
       </Text>
 
       <Card padding={0} style={{ borderRadius: radius['2xl'], overflow: 'hidden' }}>
