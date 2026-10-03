@@ -524,7 +524,7 @@ Report honestly what was and wasn't exercised on screen.
 **UI**
 - **`Button` is full-width by default.** Inside a row, pass `block={false}` or wrap it
   in a `<View style={{ flex: … }}>` — otherwise it swallows its neighbours.
-- **Grid cells:** never `width: \`${100 / n}%\`` — rounding overflows the row and the
+- **Grid cells:** never ``width: `${100 / n}%` `` — rounding overflows the row and the
   last cell wraps. Use a rounded-down constant (e.g. `'14.2857%'` for 7 columns).
 - **Every mutation shows its failure** (`alertError` / inline error). Nothing fails
   silently. Destructive actions (decline, reset password, deactivate, delete) **ask
