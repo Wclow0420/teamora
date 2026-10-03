@@ -73,6 +73,10 @@ project manager, and product owner** in one. Operating principles:
 | Push notifications | `expo-notifications` + `expo-device` (Expo push; §8)    |
 | Documents / share  | `expo-print` + `expo-sharing` (client-side payslip PDF) |
 | Server state       | `@tanstack/react-query` (see §8)                        |
+| OTA updates        | `expo-updates` (`runtimeVersion: appVersion`, §15)      |
+| Location           | `expo-location` (geofenced clock-in only)               |
+| Camera             | `expo-camera` (clock-in selfie, claim receipts)         |
+| Files              | `expo-file-system` (export / payslip files to share)    |
 
 > **Reanimated 4 note:** the Babel plugin now ships from
 > `react-native-worklets/plugin` (listed last in `babel.config.js`), and
@@ -447,6 +451,14 @@ UI — a real estimate, never presented as a filed figure. Lifecycle:
 run → `…/approve` (DRAFT→APPROVED) → `…/mark-paid` (APPROVED→PAID); re-running is
 idempotent and never clobbers an APPROVED/PAID payslip.
 
+**Compensation is configurable** (`payroll/CompensationService`): pay basis MONTHLY /
+DAILY / HOURLY; daily rate = monthly ÷ the employee's scheduled working days in that
+month (weekday bitmask, bit0 = Mon … bit6 = Sun), hourly = daily ÷ hours per day. Each
+employee's basis / days / hours override the company default (`company_settings`); a
+null override means "use the default". Unpaid leave deducts fraction × daily rate; paid
+leave and HOLIDAY events never deduct. **Staff only ever see APPROVED or PAID
+payslips** — DRAFT / IN_REVIEW are admin-only.
+
 ### Database migrations (Flyway)
 - **Flyway owns the schema; JPA runs `ddl-auto: validate`** — Hibernate never
   alters tables. Every schema change is a migration file.
@@ -472,7 +484,7 @@ idempotent and never clobbers an APPROVED/PAID payslip.
 **Every new endpoint gets at least one integration test** before it's "done" —
 covering the happy path, the auth/permission outcome (401 unauthenticated / 403
 forbidden), and key validation. Run the checks below before wrapping up any
-change; CI runs the same.
+change. (There is no CI yet — run them yourself.)
 
 **Backend tests** live in `backend/src/test/java`, named `*IT`, extend
 `AbstractIntegrationTest` (boots the full app + security chain + Flyway against a
@@ -494,3 +506,80 @@ cd backend && ./scripts/test-backend.sh        # = mvn verify
 - `docker compose build` compiles but **skips** tests — the script is the test gate.
 - **API convention:** unauthenticated → **401**, authenticated-but-forbidden →
   **403** (enforced by the security entry point).
+
+**Tests passing is not "done" for UI work.** Every QA pass so far found real bugs that
+typecheck and 290 backend tests missed (a calendar on the wrong weekdays, a Decline
+button squeezed to a sliver, company settings that never saved). Before calling a
+screen done:
+1. **Open it on the simulator** and do the real task end to end (fill, save, reopen).
+2. **Confirm the result on the server** (curl / DB), not just the success toast.
+3. **Add or update its case in `docs/QA_ROUTINE.md`** — the manual test script for
+   staff + admin, including what only a real phone can test (camera, GPS, push).
+Report honestly what was and wasn't exercised on screen.
+
+---
+
+## 14. Hard-won rules (each one was a real bug)
+
+**UI**
+- **`Button` is full-width by default.** Inside a row, pass `block={false}` or wrap it
+  in a `<View style={{ flex: … }}>` — otherwise it swallows its neighbours.
+- **Grid cells:** never `width: \`${100 / n}%\`` — rounding overflows the row and the
+  last cell wraps. Use a rounded-down constant (e.g. `'14.2857%'` for 7 columns).
+- **Every mutation shows its failure** (`alertError` / inline error). Nothing fails
+  silently. Destructive actions (decline, reset password, deactivate, delete) **ask
+  first**; approve stays one tap.
+- **No fake or placeholder data** — not in labels, defaults or seeds that reach the UI
+  (no invented bank lines, sites, shift times or "face recognition" claims). Absent
+  data shows as absent ("—", "Not set", an empty state).
+- **Show money with its currency** ("RM 0.00"), and label figures precisely ("Annual
+  left", not a sum of every leave type).
+- **Shared files get readable names** (`Payslip-<Name>-<YYYY-MM>.pdf`) and the right
+  iOS `UTI` when shared.
+- Screens refetch on app foreground / route change (`QueryFreshness`) — don't add
+  per-screen focus hacks; set sensible `staleTime` instead.
+- The admin stack redirects non-admins; still, **security is server-side** (§7).
+
+**Backend**
+- **Never mutate an entity taken from the security context** (`currentEmployee.require()`,
+  `.getCompany()`): it is detached (`open-in-view: false`), so changes are silently
+  dropped. Load a managed copy by id inside the `@Transactional` service.
+- **Dates:** always `LocalDate.now(Zones.KL)` / `YearMonth.now(Zones.KL)` — the server is UTC.
+- **Wall-clock times** are `HH:mm` text via `HhMmConverter`, never SQL `TIME`.
+- **Every new tenant table** must be added to `CompanyPurgeService` (a guard test fails
+  otherwise) and must be filtered by `company_id` on every read.
+- **Sensitive fields** (NRIC, EPF/SOCSO/tax no., bank, salary, tax profile) go only to
+  OWNER/HR_ADMIN or the employee themselves — never on list endpoints.
+- **Large blobs** (photos) live in their own table, never on a row that list queries load.
+- **Validate every request field** (`@Size`, `@DecimalMax`, …) so bad input is a 400,
+  never a DB error or a 500. Errors to clients are generic + a request ref; details go
+  to the log.
+- **Never auto-insert data that affects pay** (e.g. public holidays): suggest, let the
+  admin confirm.
+- Tests read results back with a fresh GET — a PATCH response alone once hid a write
+  that never happened.
+
+**Working with sub-agents**
+- Give each agent a written spec with the **exact JSON contract**, and tell it not to
+  commit, push, build, restart containers or touch the other side's files.
+- **Don't `git add -A` while an agent is still writing** — it commits half-finished work.
+- After agents finish: hot-swap the jar, smoke-test with curl, typecheck, then test on
+  the simulator yourself. Agents report "typecheck passes", not "it works".
+
+---
+
+## 15. Release workflow
+
+- **OTA (`eas update`) is the default delivery** for JS/TS-only changes:
+  `npx eas update --channel preview --environment preview --message "…"`.
+  Tell the user to force-quit and reopen the app twice.
+- **A new native build is needed** for: a new native module/package, permission strings
+  in `app.config.ts`, icons/splash, or any `expo` plugin change. **Never run
+  `eas build` without the owner's explicit OK.** Bump `version` in `package.json`
+  (it is the `runtimeVersion`) when native code changes, so OTA updates never reach a
+  binary that can't run them.
+- Backend dev deploy: `./scripts/test-backend.sh`, then copy the jar into `teamora-api`
+  and restart (see §12). Never hand-edit the dev DB schema or `flyway_schema_history` —
+  fix forward with a new migration.
+- Every change: commit with a clear message, push, worklog entry (§9), QA routine case.
+- Pending native-build change: camera permission text now mentions claim receipts.
