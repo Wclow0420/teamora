@@ -1,10 +1,12 @@
 package com.teamora.company;
 
 import com.teamora.company.dto.CompanyDtos.CompanyResponse;
+import com.teamora.company.dto.CompanyDtos.DeleteCompanyRequest;
 import com.teamora.company.dto.CompanyDtos.UpdateCompanyRequest;
 import com.teamora.security.CurrentEmployeeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,5 +29,16 @@ public class CompanyController {
     @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public CompanyResponse update(@Valid @RequestBody UpdateCompanyRequest req) {
         return CompanyResponse.from(companyService.update(currentEmployee.require().getCompany(), req));
+    }
+
+    /**
+     * Permanently delete the caller's company and all of its data — OWNER only.
+     * Body {@code {"password", "confirmName"}}; 400 on a wrong password / name.
+     */
+    @PostMapping("/me/delete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('OWNER')")
+    public void delete(@RequestBody(required = false) DeleteCompanyRequest req) {
+        companyService.delete(currentEmployee.require(), req);
     }
 }

@@ -3,6 +3,8 @@ package com.teamora.employee;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.employee.dto.EmployeeDtos.ChangeRoleRequest;
 import com.teamora.employee.dto.EmployeeDtos.CreateEmployeeRequest;
+import com.teamora.employee.dto.EmployeeDtos.DeletionRequest;
+import com.teamora.employee.dto.EmployeeDtos.DeletionRequestResponse;
 import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
 import com.teamora.employee.dto.EmployeeDtos.ResetPasswordRequest;
 import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
@@ -42,6 +44,15 @@ public class EmployeeController {
     @PatchMapping("/me")
     public EmployeeResponse updateMe(@RequestBody SelfUpdateRequest req) {
         return employeeService.updateOwnPhone(currentEmployee.require(), req);
+    }
+
+    /**
+     * Ask the employer to delete the caller's account (notifies every OWNER / HR_ADMIN).
+     * Body {@code {"reason"?}} (≤300). Not for the OWNER (400) — they delete the company.
+     */
+    @PostMapping("/me/deletion-request")
+    public DeletionRequestResponse requestDeletion(@Valid @RequestBody(required = false) DeletionRequest req) {
+        return employeeService.requestDeletion(currentEmployee.require(), req == null ? null : req.reason());
     }
 
     /** Directory listing — management roles only, scoped to the caller's company. */
@@ -111,5 +122,22 @@ public class EmployeeController {
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('OWNER')")
     public EmployeeResponse transferOwnership(@PathVariable UUID id) {
         return employeeService.transferOwnership(currentEmployee.require(), id);
+    }
+
+    /**
+     * Remove someone's access without erasing their records: inactive, signed out
+     * everywhere, no more pushes. Not yourself, not the OWNER (400).
+     */
+    @PostMapping("/{id}/deactivate")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
+    public EmployeeResponse deactivate(@PathVariable UUID id) {
+        return employeeService.deactivate(currentEmployee.require(), id);
+    }
+
+    /** Give a deactivated employee their access back. */
+    @PostMapping("/{id}/reactivate")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
+    public EmployeeResponse reactivate(@PathVariable UUID id) {
+        return employeeService.reactivate(currentEmployee.require(), id);
     }
 }

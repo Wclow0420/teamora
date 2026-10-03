@@ -118,6 +118,10 @@ public class Employee extends TenantEntity {
     @Column(nullable = false)
     private boolean active;
 
+    /** When the employee last asked for their account to be deleted (null ⇒ no request). */
+    @Column(name = "deletion_requested_at")
+    private java.time.Instant deletionRequestedAt;
+
     /** The employee who approves this person's leave/claims (null → company owner). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporting_manager_id")

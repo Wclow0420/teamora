@@ -6,12 +6,15 @@ import com.teamora.common.exception.ResourceNotFoundException;
 import com.teamora.company.Company;
 import com.teamora.employee.dto.EmployeeDtos.ChangeRoleRequest;
 import com.teamora.employee.dto.EmployeeDtos.CreateEmployeeRequest;
+import com.teamora.employee.dto.EmployeeDtos.DeletionRequestResponse;
 import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
 import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
 import com.teamora.leave.LeaveBalanceService;
 import com.teamora.location.WorkLocation;
+import com.teamora.notification.NotificationService;
+import com.teamora.notification.NotificationType;
 import com.teamora.notification.PushTokenRepository;
 import com.teamora.location.WorkLocationRepository;
 import com.teamora.payroll.CompensationService;
@@ -21,6 +24,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -40,6 +45,10 @@ public class EmployeeService {
     private final WorkLocationRepository workLocations;
     private final LeaveBalanceService leaveBalances;
     private final PushTokenRepository pushTokens;
+    private final NotificationService notifications;
+
+    /** A repeat deletion request inside this window is acknowledged without re-notifying. */
+    static final Duration DELETION_REQUEST_COOLDOWN = Duration.ofHours(24);
 
     /** Directory listing — scoped to the caller's company. */
     public List<EmployeeResponse> search(UUID companyId, String department, String query) {
@@ -265,6 +274,79 @@ public class EmployeeService {
         refreshTokens.revokeAllForEmployee(e.getId(), "");
         // Their devices are being signed out — stop pushing this account's alerts to them.
         pushTokens.deleteByEmployeeId(e.getId());
+    }
+
+    /**
+     * Self-service: the caller asks their employer to delete their account. The
+     * employer is the data controller and must keep payroll / statutory records,
+     * so this doesn't erase anything — it tells every active OWNER and HR_ADMIN
+     * (in-app + push), who then deactivate the account. A repeat within 24h
+     * returns the original request time without notifying again. The OWNER
+     * deletes the whole company instead (400).
+     */
+    @Transactional
+    public DeletionRequestResponse requestDeletion(Employee caller, String reason) {
+        Employee e = employees.findByIdAndCompanyId(caller.getId(), caller.getCompany().getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Employee", caller.getId()));
+        if (e.getRole() == Role.OWNER) {
+            throw new BadRequestException("As the owner, delete the company from Company settings instead.");
+        }
+        // Postgres keeps microseconds — truncate so a repeat request echoes the exact same instant.
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        Instant previous = e.getDeletionRequestedAt();
+        if (previous != null && previous.isAfter(now.minus(DELETION_REQUEST_COOLDOWN))) {
+            return new DeletionRequestResponse(previous);
+        }
+        e.setDeletionRequestedAt(now);
+
+        String why = trimToNull(reason);
+        String body = e.getFullName() + " asked for their Teamora account to be deleted." + (why == null ? "" : " " + why);
+        employees.findByCompanyIdAndRoleInAndActiveTrue(e.getCompany().getId(), List.of(Role.OWNER, Role.HR_ADMIN))
+                .stream()
+                .filter(admin -> !admin.getId().equals(e.getId()))   // an HR admin asking doesn't notify themselves
+                .forEach(admin -> notifications.create(admin, NotificationType.ACCOUNT_DELETION_REQUEST,
+                        "Account deletion request", body));
+        return new DeletionRequestResponse(now);
+    }
+
+    /**
+     * Admin (OWNER/HR_ADMIN) removes someone's access: the account is set inactive,
+     * every session is revoked and their devices stop getting pushes. Nothing is
+     * erased — payroll and other statutory history stays with the employer. Their
+     * direct reports fall back to the default approver (the owner), since an
+     * inactive manager can't sign in to decide anything. Not yourself; not the OWNER.
+     * Idempotent.
+     */
+    @Transactional
+    public EmployeeResponse deactivate(Employee caller, UUID id) {
+        UUID companyId = caller.getCompany().getId();
+        Employee e = employees.findByIdAndCompanyIdWithManager(id, companyId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
+        if (e.getId().equals(caller.getId())) {
+            throw new BadRequestException("You can't deactivate your own account");
+        }
+        if (e.getRole() == Role.OWNER) {
+            throw new BadRequestException("The owner can't be deactivated — transfer ownership first");
+        }
+        if (e.isActive()) {
+            e.setActive(false);
+            refreshTokens.revokeAllForEmployee(e.getId(), "");
+            pushTokens.deleteByEmployeeId(e.getId());
+            employees.clearReportingManager(companyId, e.getId());
+        }
+        return toDetail(e);
+    }
+
+    /** Undo {@link #deactivate}: the person can sign in again (a pending deletion request is cleared). */
+    @Transactional
+    public EmployeeResponse reactivate(Employee caller, UUID id) {
+        Employee e = employees.findByIdAndCompanyIdWithManager(id, caller.getCompany().getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
+        if (!e.isActive()) {
+            e.setActive(true);
+            e.setDeletionRequestedAt(null);
+        }
+        return toDetail(e);
     }
 
     // ---- helpers ----

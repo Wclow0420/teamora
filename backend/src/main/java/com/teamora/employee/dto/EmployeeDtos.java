@@ -122,4 +122,12 @@ public final class EmployeeDtos {
             @NotBlank(message = "Enter a new password")
             @Size(min = 8, max = 72, message = "Password must be 8 to 72 characters") String newPassword
     ) {}
+
+    /** Self-service "delete my account" request — the reason is optional. */
+    public record DeletionRequest(
+            @Size(max = 300, message = "Reason must be at most 300 characters") String reason
+    ) {}
+
+    /** When the (current, still-open) deletion request was made — ISO-8601 instant. */
+    public record DeletionRequestResponse(java.time.Instant requestedAt) {}
 }

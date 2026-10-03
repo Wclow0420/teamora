@@ -41,4 +41,15 @@ public final class CompanyDtos {
             String phone,
             String address
     ) {}
+
+    /**
+     * Owner-only "delete company and all data". {@code password} is the owner's
+     * current password; {@code confirmName} must equal the company name
+     * (case-insensitive, trimmed). Both are checked in the service so the app gets
+     * one plain-language message per field rather than a validation map.
+     */
+    public record DeleteCompanyRequest(
+            String password,
+            String confirmName
+    ) {}
 }

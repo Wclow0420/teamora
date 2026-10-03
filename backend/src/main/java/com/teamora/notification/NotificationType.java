@@ -12,13 +12,14 @@ public enum NotificationType {
     PAYSLIP_READY,
     SHIFT_REMINDER,
     CLOCK_OUT_REMINDER,
+    ACCOUNT_DELETION_REQUEST,   // an admin: an employee asked for their account to be deleted
     GENERAL;
 
     /** Theme accent key for the icon tile ("coral" | "amber" | "sage" | "violet" | "neutral"). */
     public String accentColorKey() {
         return switch (this) {
             case LEAVE_APPROVED, CLAIM_APPROVED, OVERTIME_APPROVED -> "sage";
-            case LEAVE_REJECTED, CLAIM_REJECTED, OVERTIME_REJECTED, PAYSLIP_READY -> "coral";
+            case LEAVE_REJECTED, CLAIM_REJECTED, OVERTIME_REJECTED, PAYSLIP_READY, ACCOUNT_DELETION_REQUEST -> "coral";
             case SHIFT_REMINDER -> "violet";
             case CLOCK_OUT_REMINDER, APPROVAL_REQUEST -> "amber";
             case GENERAL -> "neutral";
@@ -30,7 +31,7 @@ public enum NotificationType {
         return switch (this) {
             case LEAVE_APPROVED, CLAIM_APPROVED, OVERTIME_APPROVED -> "check";
             case LEAVE_REJECTED, CLAIM_REJECTED, OVERTIME_REJECTED -> "x";
-            case APPROVAL_REQUEST -> "bell";
+            case APPROVAL_REQUEST, ACCOUNT_DELETION_REQUEST -> "bell";
             case PAYSLIP_READY -> "wallet";
             case SHIFT_REMINDER -> "calendar";
             case CLOCK_OUT_REMINDER -> "clock";

@@ -16,6 +16,7 @@ import com.teamora.employee.dto.EmployeeResponse;
 import com.teamora.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -72,15 +73,21 @@ public class AuthService {
     }
 
     /** Rotate a refresh token: revoke the old one and issue a fresh pair. */
-    @Transactional
+    @Transactional(noRollbackFor = DisabledException.class)   // keep the revocation when refusing a deactivated account
     public AuthResponse refresh(String refreshToken) {
         RefreshToken existing = refreshTokens.findByToken(refreshToken)
                 .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+        Employee employee = existing.getEmployee();
+        if (!employee.isActive()) {
+            // Deactivated: refuse (401, the app signs out) and make sure no session survives.
+            refreshTokens.revokeAllForEmployee(employee.getId(), "");
+            throw new DisabledException("Account is deactivated");
+        }
         if (!existing.isActive()) {
             throw new BadRequestException("Refresh token expired or revoked");
         }
         existing.setRevoked(true);
-        return issue(existing.getEmployee());
+        return issue(employee);
     }
 
     @Transactional

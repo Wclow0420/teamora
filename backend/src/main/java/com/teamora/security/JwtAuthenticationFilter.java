@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -36,12 +37,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = header.substring(7);
         if (jwtService.isValid(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
             String email = jwtService.extractSubject(token);
-            UserDetails user = userDetailsService.loadUserByUsername(email);
-            var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            UserDetails user = loadIfStillAllowed(email);
+            // A still-valid access token whose account was since deactivated or deleted
+            // (with its company) authenticates nobody → the entry point answers 401.
+            if (user != null) {
+                var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private UserDetails loadIfStillAllowed(String email) {
+        try {
+            UserDetails user = userDetailsService.loadUserByUsername(email);
+            return user.isEnabled() ? user : null;
+        } catch (UsernameNotFoundException e) {
+            return null;
+        }
     }
 }

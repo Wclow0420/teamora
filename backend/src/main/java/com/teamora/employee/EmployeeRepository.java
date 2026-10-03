@@ -1,6 +1,7 @@
 package com.teamora.employee;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -62,4 +63,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
             order by e.fullName asc
             """)
     List<Employee> searchWithManager(@Param("companyId") UUID companyId, @Param("dept") String dept, @Param("q") String q);
+
+    /** Unassign a manager from all their direct reports (they fall back to the owner as approver). */
+    @Modifying
+    @Query("update Employee e set e.reportingManager = null where e.company.id = :companyId and e.reportingManager.id = :managerId")
+    int clearReportingManager(@Param("companyId") UUID companyId, @Param("managerId") UUID managerId);
 }
