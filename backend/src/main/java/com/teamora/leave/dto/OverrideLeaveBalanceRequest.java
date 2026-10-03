@@ -1,5 +1,6 @@
 package com.teamora.leave.dto;
 
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -17,5 +18,6 @@ public record OverrideLeaveBalanceRequest(
         @NotNull UUID employeeId,
         @NotNull UUID leaveTypeId,
         @Min(2000) @Max(2999) Integer leaveYear,
-        @NotNull @PositiveOrZero BigDecimal entitled
+        @NotNull @PositiveOrZero
+        @DecimalMax(value = "366", message = "Entitlement can't be more than 366 days") BigDecimal entitled
 ) {}

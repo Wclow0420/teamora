@@ -31,8 +31,12 @@ public class PayrollController {
         return payrollService.myPayslip(currentEmployee.require(), period);
     }
 
-    /** Admin payroll run summary for a period (defaults to the latest). ADMIN-only via /api/admin/**. */
+    /**
+     * Admin payroll run summary for a period (defaults to the latest). Company pay
+     * totals are OWNER/HR_ADMIN only — a MANAGER gets 403.
+     */
     @GetMapping("/api/admin/payroll/summary")
+    @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public PayrollSummaryResponse summary(@RequestParam(required = false) String period) {
         return payrollService.summary(period, currentEmployee.require().getCompany().getId());
     }
@@ -49,7 +53,7 @@ public class PayrollController {
     /** Generate/refresh DRAFT payslips for a period from real salary + approved OT + claims. */
     @PostMapping("/api/admin/payroll/run")
     @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
-    public PayrollRunResponse runPayroll(@RequestBody PayrollRunRequest body) {
+    public PayrollRunResponse runPayroll(@jakarta.validation.Valid @RequestBody PayrollRunRequest body) {
         return payrollService.runPayroll(body.period(), companyId());
     }
 
@@ -57,14 +61,14 @@ public class PayrollController {
     @PostMapping("/api/admin/payroll/run/{period}/approve")
     @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public PayrollRunResponse approveRun(@PathVariable String period) {
-        return payrollService.approveRun(period, companyId());
+        return payrollService.approveRun(period, currentEmployee.require());
     }
 
     /** Mark an approved run as paid (APPROVED → PAID). */
     @PostMapping("/api/admin/payroll/run/{period}/mark-paid")
     @PreAuthorize("hasAnyRole('OWNER','HR_ADMIN')")
     public PayrollRunResponse markRunPaid(@PathVariable String period) {
-        return payrollService.markRunPaid(period, companyId());
+        return payrollService.markRunPaid(period, currentEmployee.require());
     }
 
     private UUID companyId() {

@@ -34,7 +34,7 @@ class CompanyDeletionIT extends AbstractIntegrationTest {
     JdbcTemplate jdbc;
 
     /**
-     * Every table from the migrations (V1–V22) except flyway_schema_history,
+     * Every table from the migrations (V1–V26) except flyway_schema_history,
      * with the SQL predicate that ties a row to a company. Keep in step with
      * {@link CompanyPurgeService}.
      */
@@ -49,6 +49,8 @@ class CompanyDeletionIT extends AbstractIntegrationTest {
         TENANT_TABLES.put("push_tokens", "company_id = ?::uuid");
         TENANT_TABLES.put("notifications", "company_id = ?::uuid");
         TENANT_TABLES.put("attendance_records", "company_id = ?::uuid");
+        TENANT_TABLES.put("attendance_photos", "company_id = ?::uuid");
+        TENANT_TABLES.put("audit_events", "company_id = ?::uuid");
         TENANT_TABLES.put("leave_types", "company_id = ?::uuid");
         TENANT_TABLES.put("leave_balances", "company_id = ?::uuid");
         TENANT_TABLES.put("leave_requests", "company_id = ?::uuid");
@@ -146,6 +148,9 @@ class CompanyDeletionIT extends AbstractIntegrationTest {
         // Payslips.
         mvc.perform(post("/api/admin/payroll/run").header("Authorization", bearer(owner)).contentType("application/json")
                         .content("{\"period\":\"2026-09\"}"))
+                .andExpect(status().isOk());
+        // Audit trail (payroll approval is audited).
+        mvc.perform(post("/api/admin/payroll/run/2026-09/approve").header("Authorization", bearer(owner)))
                 .andExpect(status().isOk());
 
         return new Co(companyId, name, owner, ownerEmail, hr, hrEmail, emp, empEmail,

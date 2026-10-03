@@ -38,7 +38,7 @@ public class CompanyController {
     @PostMapping("/me/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('OWNER')")
-    public void delete(@RequestBody(required = false) DeleteCompanyRequest req) {
+    public void delete(@Valid @RequestBody(required = false) DeleteCompanyRequest req) {
         companyService.delete(currentEmployee.require(), req);
     }
 }

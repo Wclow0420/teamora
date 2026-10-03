@@ -362,13 +362,14 @@ needed. Full details in `backend/README.md`.
 - **Layout:** package-by-feature under `com.teamora` (`auth`, `company`,
   `employee`, `attendance`, `leave`, `claim`, `overtime`, `payroll`, `calendar`,
   `schedule`, `notification`, + `config`, `security`, `common`, `seed`).
-- **Migrations:** currently `V1`–`V22` (init → multi-tenancy & roles →
+- **Migrations:** currently `V1`–`V26` (init → multi-tenancy & roles →
   reporting-manager + single-owner → overtime → schedule → company events →
   notifications → push tokens → employee monthly_salary → tax profile + payslip PCB →
   configurable comp + leave types → work locations → clock-in photo → employee
   statutory/bank → partial-day leave → leave accrual/carry-forward → claim receipt
   photo → QA round 2 (work start time, late grace, override flag, per-company
-  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks → decline reasons → employee deletion requests).
+  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks → decline reasons → employee deletion requests → attendance photos table → hashed refresh tokens →
+  audit events → case-insensitive unique email).
 - **Wall-clock times are stored as `HH:mm` text** (`common.HhMmConverter`), not SQL
   `TIME` — a `TIME` column goes through the JDBC time-zone conversion and a
   migration default reads back shifted.
@@ -384,6 +385,14 @@ needed. Full details in `backend/README.md`.
   a suggestion list (`/api/admin/calendar/holiday-suggestions` → `holiday-import`) that
   the admin ticks — never auto-inserted (dates differ by state; source isn't the gazette).
   Add next year's dates to that file each year.
+- **Production safety:** `TEAMORA_ENV=production` refuses to start with seeding on,
+  a placeholder/short JWT secret, an exposed reset code, or reset enabled with only the
+  log sender; Swagger is off there. Deploy with `docker-compose.prod.yml` — see
+  `backend/DEPLOY.md`. Auth endpoints are rate-limited (in-memory, per instance).
+- **PII scoping:** `GET /api/employees` returns a slim summary (no salary, NRIC,
+  statutory or bank fields). Detail returns those only to OWNER/HR_ADMIN. Bank, salary,
+  role, admin reset, (de)activation and payroll approve/paid are written to
+  `audit_events` (`GET /api/admin/audit`).
 - **Dev deploy without an image rebuild:** `./scripts/test-backend.sh` builds the
   jar; `docker cp target/teamora-api-1.0.0.jar teamora-api:/app/app.jar && docker
   restart teamora-api` applies new migrations on start.

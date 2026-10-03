@@ -1,5 +1,8 @@
+# LOCAL DEV stack (API + Postgres + pgAdmin). For a real deployment use
+# docker-compose.prod.yml — see DEPLOY.md.
 # Config comes from `.env` (see .env.example). Compose auto-loads `.env` in this
-# directory for ${VAR} substitution; defaults below keep it working without one.
+# directory for ${VAR} substitution. TEAMORA_JWT_SECRET has no default: copy
+# .env.example to .env first, or the API refuses to start.
 services:
   db:
     image: postgres:16-alpine
@@ -30,10 +33,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-teamora}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-teamora}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-teamora}
-      TEAMORA_JWT_SECRET: ${TEAMORA_JWT_SECRET:-change-me-in-prod-this-is-a-dev-only-256-bit-secret-key-0123456789}
+      TEAMORA_ENV: ${TEAMORA_ENV:-dev}
+      # No default on purpose: the API refuses to start without a secret (set it in .env).
+      TEAMORA_JWT_SECRET: ${TEAMORA_JWT_SECRET:-}
       TEAMORA_CORS_ORIGINS: ${TEAMORA_CORS_ORIGINS:-*}
-      TEAMORA_SEED: ${TEAMORA_SEED:-true}
+      TEAMORA_SEED: ${TEAMORA_SEED:-false}
       PASSWORD_RESET_EXPOSE_CODE: ${PASSWORD_RESET_EXPOSE_CODE:-false}
+      PASSWORD_RESET_ENABLED: ${PASSWORD_RESET_ENABLED:-true}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-true}
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: ${SEC_LOG:-INFO}
     ports:
       - "${API_PORT:-8080}:8080"

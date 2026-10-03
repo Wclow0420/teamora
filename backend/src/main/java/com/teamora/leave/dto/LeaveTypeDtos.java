@@ -37,7 +37,7 @@ public final class LeaveTypeDtos {
             @NotBlank @Size(max = 64) String name,
             @Size(max = 24) String code,
             Boolean paid,
-            @PositiveOrZero Integer defaultEntitlementDays,
+            @PositiveOrZero @jakarta.validation.constraints.Max(366) Integer defaultEntitlementDays,
             LeaveAccrual accrual,
             @PositiveOrZero @DecimalMax("999.99") java.math.BigDecimal carryForwardMaxDays,
             @Size(max = 16) String colorKey,
@@ -49,7 +49,7 @@ public final class LeaveTypeDtos {
     public record UpdateLeaveTypeRequest(
             @Size(max = 64) String name,
             Boolean paid,
-            @PositiveOrZero Integer defaultEntitlementDays,
+            @PositiveOrZero @jakarta.validation.constraints.Max(366) Integer defaultEntitlementDays,
             LeaveAccrual accrual,
             @PositiveOrZero @DecimalMax("999.99") java.math.BigDecimal carryForwardMaxDays,
             @Size(max = 16) String colorKey,

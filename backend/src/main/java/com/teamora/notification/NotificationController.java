@@ -36,7 +36,7 @@ public class NotificationController {
     /** Unregister a push token (e.g. on sign-out). */
     @DeleteMapping("/api/notifications/push-token")
     public ResponseEntity<Void> removePushToken(@RequestParam String token) {
-        notificationService.removePushToken(token);
+        notificationService.removePushToken(currentEmployee.require(), token);
         return ResponseEntity.noContent().build();
     }
 }

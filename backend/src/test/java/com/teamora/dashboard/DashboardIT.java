@@ -40,7 +40,9 @@ class DashboardIT extends AbstractIntegrationTest {
         String nadia = login("nadia@lumi.com", "password");
         mvc.perform(get("/api/admin/dashboard").header("Authorization", bearer(nadia)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.headcount").value(greaterThan(0)));
+                .andExpect(jsonPath("$.headcount").value(greaterThan(0)))
+                // Company pay totals are OWNER/HR_ADMIN only.
+                .andExpect(jsonPath("$.payrollDueLabel").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

@@ -1,5 +1,7 @@
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { isAdminRole } from '@/api/types';
 import { palette } from '@/theme';
 
 /**
@@ -8,6 +10,12 @@ import { palette } from '@/theme';
  * with a back button and no tab bar.
  */
 export default function AdminLayout() {
+  // Managers and staff live in the staff app. The server already refuses their
+  // admin calls; this keeps a deep link from opening a screen of empty fields.
+  const { status, role } = useAuth();
+  if (status === 'authenticated' && !isAdminRole(role)) return <Redirect href="/home" />;
+  if (status === 'unauthenticated') return <Redirect href="/onboarding" />;
+
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
       <Stack.Screen name="(tabs)" />

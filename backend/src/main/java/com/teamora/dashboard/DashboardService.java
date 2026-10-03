@@ -9,6 +9,7 @@ import com.teamora.claim.ClaimService;
 import com.teamora.dashboard.dto.DashboardResponse;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
+import com.teamora.employee.Role;
 import com.teamora.leave.LeaveRequest;
 import com.teamora.leave.LeaveRequestRepository;
 import com.teamora.leave.LeaveService;
@@ -78,7 +79,9 @@ public class DashboardService {
                 + overtimeService.pending(caller).size();
 
         // ---- Payroll due (current month's net total label, no "RM " prefix) ----
-        String payrollDueLabel = currentPayrollNetLabel(companyId);
+        // Company pay totals are OWNER/HR_ADMIN only: a MANAGER gets null.
+        boolean seesPayroll = caller.getRole() == Role.OWNER || caller.getRole() == Role.HR_ADMIN;
+        String payrollDueLabel = seesPayroll ? currentPayrollNetLabel(companyId) : null;
 
         // ---- Week chart (current ISO week, Mon..Sun) ----
         DashboardResponse.Week week = buildWeek(companyId, today, headcount);

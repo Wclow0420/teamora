@@ -33,7 +33,8 @@ public record EmployeeResponse(
         BigDecimal monthlySalary,
         MaritalStatus maritalStatus,
         Boolean spouseWorking,
-        int numChildren,
+        /** Null only in the redacted (MANAGER) view. */
+        Integer numChildren,
         // Statutory & bank identity (all optional)
         String nric,
         String epfNo,
@@ -66,6 +67,22 @@ public record EmployeeResponse(
                 ? e.getReportingManager()
                 : null;
         return build(e, mgr, null, null, null, null, null);
+    }
+
+    /**
+     * The same profile with the sensitive HR/payroll fields removed — statutory
+     * numbers, bank details, salary, tax profile, pay settings and derived rates.
+     * What a MANAGER sees on {@code GET /api/employees/{id}}.
+     */
+    public EmployeeResponse withoutSensitive() {
+        return new EmployeeResponse(
+                id, email, fullName, initial, role, jobTitle, department, location, staffId, phone, joinDate,
+                active, companyId, companyName, reportingManagerId, reportingManagerName, workLocationId,
+                workLocationName,
+                null, null, null, null,
+                null, null, null, null, null, null,
+                null, null, null, null, null,
+                null, null, null);
     }
 
     /** For paths that fetch-join {@code reportingManager} (list / after update). */

@@ -86,9 +86,10 @@ public class NotificationService {
         pushTokens.save(pt);
     }
 
+    /** Unregister one of the caller's own devices; someone else's token is left alone (still 204). */
     @Transactional
-    public void removePushToken(String token) {
-        pushTokens.deleteByToken(token);
+    public void removePushToken(Employee employee, String token) {
+        pushTokens.deleteByTokenAndEmployeeId(token, employee.getId());
     }
 
     private static String clip(String s, int max) {

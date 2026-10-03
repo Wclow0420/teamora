@@ -1,5 +1,6 @@
 package com.teamora.notification.dto;
 
+import jakarta.validation.constraints.Size;
 import com.teamora.notification.Notification;
 import jakarta.validation.constraints.NotBlank;
 
@@ -13,7 +14,7 @@ public final class NotificationDtos {
     private NotificationDtos() {}
 
     /** Register/unregister an Expo push token for the current device. */
-    public record PushTokenRequest(@NotBlank String token, String platform) {}
+    public record PushTokenRequest(@NotBlank @Size(max = 255) String token, @Size(max = 16) String platform) {}
 
     /** A single feed row: icon tile + title/body + relative time + unread dot. */
     public record NotificationItem(

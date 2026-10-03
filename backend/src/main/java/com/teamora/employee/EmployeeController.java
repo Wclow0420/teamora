@@ -10,6 +10,7 @@ import com.teamora.employee.dto.EmployeeDtos.ResetPasswordRequest;
 import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
+import com.teamora.employee.dto.EmployeeSummaryResponse;
 import com.teamora.security.CurrentEmployeeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +43,7 @@ public class EmployeeController {
      * everything else stays admin-only via {@code PATCH /{id}}.
      */
     @PatchMapping("/me")
-    public EmployeeResponse updateMe(@RequestBody SelfUpdateRequest req) {
+    public EmployeeResponse updateMe(@Valid @RequestBody SelfUpdateRequest req) {
         return employeeService.updateOwnPhone(currentEmployee.require(), req);
     }
 
@@ -55,10 +56,13 @@ public class EmployeeController {
         return employeeService.requestDeletion(currentEmployee.require(), req == null ? null : req.reason());
     }
 
-    /** Directory listing — management roles only, scoped to the caller's company. */
+    /**
+     * Directory listing — management roles only, scoped to the caller's company.
+     * Slim summary: never the statutory / bank / salary / tax fields (see the detail endpoint).
+     */
     @GetMapping
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN','MANAGER')")
-    public List<EmployeeResponse> list(@RequestParam(required = false) String dept,
+    public List<EmployeeSummaryResponse> list(@RequestParam(required = false) String dept,
                                        @RequestParam(required = false) String q) {
         return employeeService.search(currentEmployee.require().getCompany().getId(), dept, q);
     }
@@ -73,7 +77,13 @@ public class EmployeeController {
     @GetMapping("/{id}")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('OWNER','HR_ADMIN','MANAGER')")
     public EmployeeResponse get(@PathVariable UUID id) {
-        return employeeService.get(currentEmployee.require().getCompany().getId(), id);
+        Employee caller = currentEmployee.require();
+        EmployeeResponse detail = employeeService.get(caller.getCompany().getId(), id);
+        // NRIC, bank, salary, tax and pay settings are OWNER/HR_ADMIN only — a MANAGER
+        // sees the rest of the profile with those fields null.
+        boolean seesSensitive = caller.getRole() == Role.OWNER || caller.getRole() == Role.HR_ADMIN
+                || caller.getId().equals(id);
+        return seesSensitive ? detail : detail.withoutSensitive();
     }
 
     /** Add an employee to the caller's company. */
@@ -92,7 +102,7 @@ public class EmployeeController {
         if (me.getId().equals(id)) {
             throw new BadRequestException("You cannot change your own role");
         }
-        return employeeService.changeRole(me.getCompany().getId(), id, req);
+        return employeeService.changeRole(me, id, req);
     }
 
     /**

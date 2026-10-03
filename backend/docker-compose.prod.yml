@@ -1,0 +1,54 @@
+# PRODUCTION stack: API + Postgres only (no pgAdmin, DB not reachable from the
+# host network, API only on 127.0.0.1 behind a TLS reverse proxy). See DEPLOY.md.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Required in the env file: POSTGRES_PASSWORD, TEAMORA_JWT_SECRET.
+name: teamora-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-teamora}
+      POSTGRES_USER: ${POSTGRES_USER:-teamora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    # No `ports:` on purpose — only the api container can reach Postgres.
+    volumes:
+      - teamora-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teamora} -d ${POSTGRES_DB:-teamora}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TEAMORA_ENV: production
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-teamora}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-teamora}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      TEAMORA_JWT_SECRET: ${TEAMORA_JWT_SECRET:?TEAMORA_JWT_SECRET is required (openssl rand -base64 48)}
+      TEAMORA_CORS_ORIGINS: ${TEAMORA_CORS_ORIGINS:-*}
+      TEAMORA_SEED: "false"
+      PASSWORD_RESET_EXPOSE_CODE: "false"
+      # Stays false until a real email sender is configured (the app refuses otherwise).
+      PASSWORD_RESET_ENABLED: ${PASSWORD_RESET_ENABLED:-false}
+    # Loopback only: the reverse proxy (Caddy/nginx) on this host terminates TLS.
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"UP\"' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  teamora-pgdata:

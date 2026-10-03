@@ -13,6 +13,7 @@ import com.teamora.company.CompanySettings;
 import com.teamora.company.CompanySettingsService;
 import com.teamora.employee.Employee;
 import com.teamora.employee.EmployeeRepository;
+import com.teamora.employee.Role;
 import com.teamora.location.WorkLocation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -41,6 +42,7 @@ public class AttendanceService {
     private static final ZoneId KL = ZoneId.of("Asia/Kuala_Lumpur");
 
     private final AttendanceRepository attendance;
+    private final AttendancePhotoRepository photos;
     private final EmployeeRepository employees;
     private final CompanySettingsService companySettings;
 
@@ -85,12 +87,13 @@ public class AttendanceService {
             record.setBreakMinutes(record.getBreakMinutes() + (int) away);
             record.setClockOutAt(null);
             record.setWorkedMinutes(null);
-            if (record.getClockInPhotoType() == null && photoBase64 != null && !photoBase64.isBlank()) {
-                PhotoCodec.Photo photo = PhotoCodec.decode(photoBase64);
-                record.setClockInPhoto(photo.bytes());
+            PhotoCodec.Photo photo = record.getClockInPhotoType() == null ? decodeOptional(photoBase64) : null;
+            if (photo != null) {
                 record.setClockInPhotoType(photo.contentType());
             }
-            return todayResponse(attendance.save(record), current);
+            AttendanceRecord saved = attendance.save(record);
+            storePhoto(saved, photo);
+            return todayResponse(saved, current);
         }
 
         LocalTime localNow = now.atZone(KL).toLocalTime();
@@ -113,13 +116,33 @@ public class AttendanceService {
         record.setClockInLng(longitude);
 
         // Optional selfie proof — non-blocking: absent → clock-in proceeds unchanged.
-        if (photoBase64 != null && !photoBase64.isBlank()) {
-            PhotoCodec.Photo photo = PhotoCodec.decode(photoBase64);
-            record.setClockInPhoto(photo.bytes());
+        // Decoded (and validated) before anything is saved, so a bad photo is a clean 400.
+        PhotoCodec.Photo photo = decodeOptional(photoBase64);
+        if (photo != null) {
             record.setClockInPhotoType(photo.contentType());
         }
 
-        return todayResponse(attendance.save(record), current);
+        AttendanceRecord saved = attendance.save(record);
+        storePhoto(saved, photo);
+        return todayResponse(saved, current);
+    }
+
+    private static PhotoCodec.Photo decodeOptional(String photoBase64) {
+        return photoBase64 != null && !photoBase64.isBlank() ? PhotoCodec.decode(photoBase64) : null;
+    }
+
+    /** The selfie bytes go to attendance_photos (V23), never onto the record row. */
+    private void storePhoto(AttendanceRecord record, PhotoCodec.Photo photo) {
+        if (photo == null) {
+            return;
+        }
+        photos.save(AttendancePhoto.builder()
+                .recordId(record.getId())
+                .companyId(record.getCompany().getId())
+                .photo(photo.bytes())
+                .contentType(photo.contentType())
+                .createdAt(Instant.now())
+                .build());
     }
 
     /**
@@ -199,25 +222,28 @@ public class AttendanceService {
 
     /**
      * Streamable clock-in selfie for an attendance record. Access: the record's
-     * own employee, OR a management-role user (OWNER/HR_ADMIN/MANAGER) in the
-     * same company (tenant-scoped). 404 if the record or its photo is missing.
+     * own employee; an OWNER/HR_ADMIN of the same company; or a MANAGER for their
+     * direct reports only (403 for anyone else in the company). Another company's
+     * record is 404, as is a record without a photo — existence isn't leaked.
      */
     public PhotoData getPhoto(Employee current, UUID recordId) {
         AttendanceRecord record = attendance.findById(recordId)
+                .filter(r -> r.getCompany().getId().equals(current.getCompany().getId()))
                 .orElseThrow(() -> ResourceNotFoundException.of("Attendance record", recordId));
 
-        boolean isSelf = record.getEmployee().getId().equals(current.getId());
-        boolean isSameCompanyAdmin = current.getRole().isManagement()
-                && record.getCompany().getId().equals(current.getCompany().getId());
-        if (!isSelf && !isSameCompanyAdmin) {
+        Employee subject = record.getEmployee();
+        boolean isSelf = subject.getId().equals(current.getId());
+        boolean isAdmin = current.getRole() == Role.OWNER || current.getRole() == Role.HR_ADMIN;
+        boolean isTheirManager = current.getRole() == Role.MANAGER
+                && subject.getReportingManager() != null
+                && subject.getReportingManager().getId().equals(current.getId());
+        if (!isSelf && !isAdmin && !isTheirManager) {
             throw new AccessDeniedException("You cannot view this attendance photo");
         }
 
-        byte[] bytes = record.getClockInPhoto();
-        if (bytes == null || bytes.length == 0) {
-            throw ResourceNotFoundException.of("Attendance photo", recordId);
-        }
-        return new PhotoData(bytes, PhotoCodec.typeOrDefault(record.getClockInPhotoType()));
+        AttendancePhoto photo = photos.findById(recordId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Attendance photo", recordId));
+        return new PhotoData(photo.getPhoto(), PhotoCodec.typeOrDefault(photo.getContentType()));
     }
 
     /** Raw selfie bytes + content-type for the photo endpoint. */

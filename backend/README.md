@@ -12,11 +12,14 @@ cd backend
 cp .env.example .env             # then edit values (esp. TEAMORA_JWT_SECRET for prod)
 ```
 
-`docker-compose.yml` reads `.env` automatically (with built-in defaults, so it
-runs even without one). Keys: `POSTGRES_*`, `DB_HOST_PORT` (default 5435),
-`API_PORT` (8080), `TEAMORA_JWT_SECRET`, `TEAMORA_SEED`, `TEAMORA_CORS_ORIGINS`,
-`PGADMIN_*`. For a non-Docker run, `application.yml` reads the same variable
-names from the environment.
+`docker-compose.yml` reads `.env` automatically. `TEAMORA_JWT_SECRET` has **no
+default** — the API refuses to start without one (≥ 32 bytes), so create `.env`
+first. `TEAMORA_SEED` defaults to **false** — set it to `true` in your local `.env`
+for the demo accounts. Keys: `POSTGRES_*`, `DB_HOST_PORT` (default 5435), `API_PORT` (8080),
+`TEAMORA_ENV` (dev|production), `TEAMORA_JWT_SECRET`, `TEAMORA_SEED`,
+`TEAMORA_CORS_ORIGINS`, `PASSWORD_RESET_*`, `PGADMIN_*`. For a non-Docker run,
+`application.yml` reads the same variable names from the environment.
+**Deploying for real:** see [DEPLOY.md](DEPLOY.md) (`docker-compose.prod.yml`).
 
 ## Run it (Docker — no local Java/Maven needed)
 

@@ -1,5 +1,6 @@
 package com.teamora.company.dto;
 
+import jakarta.validation.constraints.Size;
 import com.teamora.company.Company;
 
 import java.util.UUID;
@@ -33,13 +34,13 @@ public final class CompanyDtos {
 
     /** Partial update of the current company's profile. */
     public record UpdateCompanyRequest(
-            String name,
-            String registrationNo,
-            String epfNo,
-            String socsoNo,
-            String email,
-            String phone,
-            String address
+            @Size(max = 150, message = "Company name must be at most 150 characters") String name,
+            @Size(max = 64, message = "Registration number must be at most 64 characters") String registrationNo,
+            @Size(max = 64, message = "EPF number must be at most 64 characters") String epfNo,
+            @Size(max = 64, message = "SOCSO number must be at most 64 characters") String socsoNo,
+            @Size(max = 254, message = "Email must be at most 254 characters") String email,
+            @Size(max = 32, message = "Phone number must be at most 32 characters") String phone,
+            @Size(max = 500, message = "Address must be at most 500 characters") String address
     ) {}
 
     /**
@@ -49,7 +50,7 @@ public final class CompanyDtos {
      * one plain-language message per field rather than a validation map.
      */
     public record DeleteCompanyRequest(
-            String password,
-            String confirmName
+            @Size(max = 128) String password,
+            @Size(max = 255) String confirmName
     ) {}
 }

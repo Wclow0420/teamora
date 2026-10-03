@@ -8,6 +8,7 @@ public record DashboardResponse(
         long presentToday,
         long onLeaveToday,
         long pendingApprovals,
+        /** Net payroll total label — null for a MANAGER (pay totals are OWNER/HR_ADMIN only). */
         String payrollDueLabel,
         Week week,
         List<Activity> activity

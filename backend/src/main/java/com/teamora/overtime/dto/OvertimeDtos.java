@@ -1,5 +1,6 @@
 package com.teamora.overtime.dto;
 
+import jakarta.validation.constraints.Size;
 import com.teamora.overtime.OvertimeRequest;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -19,7 +20,7 @@ public final class OvertimeDtos {
     public record SubmitOvertimeRequest(
             @NotNull LocalDate workDate,
             @NotNull @DecimalMin("0.5") @DecimalMax("24.0") BigDecimal hours,
-            String reason
+            @Size(max = 500, message = "Reason must be at most 500 characters") String reason
     ) {}
 
     /** The employee's own overtime row. */

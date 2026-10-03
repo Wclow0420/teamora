@@ -28,6 +28,7 @@ import {
   DashboardSummary,
   DeleteCompanyBody,
   EmployeeResponse,
+  EmployeeSummary,
   ExportFile,
   ExportType,
   ManagerOption,
@@ -87,7 +88,7 @@ export const employeeApi = {
     if (dept) params.set('dept', dept);
     if (q) params.set('q', q);
     const qs = params.toString();
-    return api.get<EmployeeResponse[]>(`/api/employees${qs ? `?${qs}` : ''}`);
+    return api.get<EmployeeSummary[]>(`/api/employees${qs ? `?${qs}` : ''}`);
   },
   get: (id: string) => api.get<EmployeeResponse>(`/api/employees/${id}`),
   create: (body: CreateEmployeeBody) => api.post<EmployeeResponse>('/api/employees', body),

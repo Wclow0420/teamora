@@ -1,5 +1,8 @@
 package com.teamora.employee;
 
+import com.teamora.audit.AuditAction;
+import com.teamora.audit.AuditService;
+import com.teamora.auth.AuthService;
 import com.teamora.auth.RefreshTokenRepository;
 import com.teamora.common.exception.BadRequestException;
 import com.teamora.common.exception.ResourceNotFoundException;
@@ -11,6 +14,7 @@ import com.teamora.employee.dto.EmployeeDtos.ManagerOption;
 import com.teamora.employee.dto.EmployeeDtos.SelfUpdateRequest;
 import com.teamora.employee.dto.EmployeeDtos.UpdateEmployeeRequest;
 import com.teamora.employee.dto.EmployeeResponse;
+import com.teamora.employee.dto.EmployeeSummaryResponse;
 import com.teamora.leave.LeaveBalanceService;
 import com.teamora.location.WorkLocation;
 import com.teamora.notification.NotificationService;
@@ -24,11 +28,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -46,15 +52,16 @@ public class EmployeeService {
     private final LeaveBalanceService leaveBalances;
     private final PushTokenRepository pushTokens;
     private final NotificationService notifications;
+    private final AuditService audit;
 
     /** A repeat deletion request inside this window is acknowledged without re-notifying. */
     static final Duration DELETION_REQUEST_COOLDOWN = Duration.ofHours(24);
 
-    /** Directory listing — scoped to the caller's company. */
-    public List<EmployeeResponse> search(UUID companyId, String department, String query) {
+    /** Directory listing — scoped to the caller's company; slim (no sensitive fields), inactive included. */
+    public List<EmployeeSummaryResponse> search(UUID companyId, String department, String query) {
         String dept = (department == null || department.isBlank() || department.equalsIgnoreCase("all")) ? "" : department;
         String q = (query == null || query.isBlank()) ? "" : query;
-        return employees.searchWithManager(companyId, dept, q).stream().map(EmployeeResponse::withManager).toList();
+        return employees.searchWithManager(companyId, dept, q).stream().map(EmployeeSummaryResponse::from).toList();
     }
 
     public EmployeeResponse get(UUID companyId, UUID id) {
@@ -88,11 +95,11 @@ public class EmployeeService {
     @Transactional
     public EmployeeResponse create(Company company, CreateEmployeeRequest req) {
         rejectOwnerRole(req.role());
-        if (employees.existsByEmailIgnoreCase(req.email())) {
+        if (employees.existsByEmailIgnoreCase(AuthService.normaliseEmail(req.email()))) {
             throw new BadRequestException("An account with this email already exists");
         }
         Employee e = Employee.builder()
-                .email(req.email().trim())
+                .email(AuthService.normaliseEmail(req.email()))
                 .passwordHash(passwordEncoder.encode(req.password()))
                 .fullName(req.fullName())
                 .role(req.role())
@@ -123,14 +130,18 @@ public class EmployeeService {
     }
 
     @Transactional
-    public EmployeeResponse changeRole(UUID companyId, UUID id, ChangeRoleRequest req) {
+    public EmployeeResponse changeRole(Employee caller, UUID id, ChangeRoleRequest req) {
         rejectOwnerRole(req.role());
-        Employee e = employees.findByIdAndCompanyId(id, companyId)
+        Employee e = employees.findByIdAndCompanyId(id, caller.getCompany().getId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Employee", id));
         if (e.getRole() == Role.OWNER) {
             throw new BadRequestException("The owner's role can only change via transfer-ownership");
         }
+        Role before = e.getRole();
         e.setRole(req.role());
+        if (before != req.role()) {
+            audit.record(caller, e, AuditAction.ROLE_CHANGED, AuditService.details("from", before, "to", req.role()));
+        }
         return EmployeeResponse.from(e);
     }
 
@@ -151,6 +162,12 @@ public class EmployeeService {
         boolean clearDays = clearing(req.clearWorkingDays(), req.workingDays(), "workingDays");
         boolean clearHours = clearing(req.clearHoursPerDay(), req.hoursPerDay(), "hoursPerDay");
         boolean clearBasis = clearing(req.clearPayBasis(), req.payBasis(), "payBasis");
+
+        // Snapshot the audited fields before anything changes.
+        String bankNameBefore = e.getBankName();
+        String bankAccountBefore = e.getBankAccountNo();
+        BigDecimal salaryBefore = e.getMonthlySalary();
+        Role roleBefore = e.getRole();
 
         if (req.fullName() != null && !req.fullName().isBlank()) e.setFullName(req.fullName().trim());
         if (req.jobTitle() != null) e.setJobTitle(req.jobTitle().isBlank() ? null : req.jobTitle().trim());
@@ -207,7 +224,37 @@ public class EmployeeService {
             }
             e.setRole(req.role());
         }
+        auditUpdate(caller, e, bankNameBefore, bankAccountBefore, salaryBefore, roleBefore);
         return toDetail(e);
+    }
+
+    /** Audit-trail + notify for the sensitive parts of an admin profile update. */
+    private void auditUpdate(Employee caller, Employee e, String bankNameBefore, String bankAccountBefore,
+                             BigDecimal salaryBefore, Role roleBefore) {
+        boolean bankChanged = !Objects.equals(bankNameBefore, e.getBankName())
+                || !Objects.equals(bankAccountBefore, e.getBankAccountNo());
+        if (bankChanged) {
+            audit.record(caller, e, AuditAction.BANK_DETAILS_CHANGED, AuditService.details(
+                    "bankNameFrom", bankNameBefore, "bankNameTo", e.getBankName(),
+                    "bankAccountFrom", AuditService.mask(bankAccountBefore),
+                    "bankAccountTo", AuditService.mask(e.getBankAccountNo())));
+            if (!caller.getId().equals(e.getId())) {
+                // Salary-diversion guard: the employee always hears about a payout change they didn't make.
+                String account = e.getBankAccountNo() == null ? "removed"
+                        : "now " + (e.getBankName() == null ? "" : e.getBankName() + " ") + AuditService.mask(e.getBankAccountNo());
+                notifications.create(e, NotificationType.BANK_DETAILS_CHANGED, "Your bank details were changed",
+                        caller.getFullName() + " updated the bank account your salary is paid into (" + account
+                                + "). If you didn't ask for this, contact HR right away.");
+            }
+        }
+        if (salaryBefore == null ? e.getMonthlySalary() != null
+                : e.getMonthlySalary() == null || salaryBefore.compareTo(e.getMonthlySalary()) != 0) {
+            audit.record(caller, e, AuditAction.SALARY_CHANGED,
+                    AuditService.details("from", salaryBefore, "to", e.getMonthlySalary()));
+        }
+        if (roleBefore != e.getRole()) {
+            audit.record(caller, e, AuditAction.ROLE_CHANGED, AuditService.details("from", roleBefore, "to", e.getRole()));
+        }
     }
 
     /**
@@ -232,10 +279,14 @@ public class EmployeeService {
             throw new BadRequestException("Cannot transfer ownership to an inactive employee");
         }
 
+        Role targetBefore = target.getRole();
         current.setRole(Role.HR_ADMIN);
         employees.saveAndFlush(current);   // demote hits the DB first
         target.setRole(Role.OWNER);
         employees.saveAndFlush(target);    // now only one OWNER row for this company
+        audit.record(current, target, AuditAction.OWNERSHIP_TRANSFERRED, AuditService.details(
+                "previousOwnerId", current.getId(), "previousOwnerNowRole", Role.HR_ADMIN,
+                "newOwnerPreviousRole", targetBefore));
         return EmployeeResponse.from(target);
     }
 
@@ -271,9 +322,10 @@ public class EmployeeService {
             throw new BadRequestException("Use Change password to change your own password");
         }
         e.setPasswordHash(passwordEncoder.encode(newPassword));
-        refreshTokens.revokeAllForEmployee(e.getId(), "");
+        int sessions = refreshTokens.revokeAllForEmployee(e.getId(), "");
         // Their devices are being signed out — stop pushing this account's alerts to them.
         pushTokens.deleteByEmployeeId(e.getId());
+        audit.record(caller, e, AuditAction.PASSWORD_RESET_BY_ADMIN, AuditService.details("sessionsRevoked", sessions));
     }
 
     /**
@@ -332,7 +384,9 @@ public class EmployeeService {
             e.setActive(false);
             refreshTokens.revokeAllForEmployee(e.getId(), "");
             pushTokens.deleteByEmployeeId(e.getId());
-            employees.clearReportingManager(companyId, e.getId());
+            int reportsReassigned = employees.clearReportingManager(companyId, e.getId());
+            audit.record(caller, e, AuditAction.EMPLOYEE_DEACTIVATED,
+                    AuditService.details("directReportsReassigned", reportsReassigned));
         }
         return toDetail(e);
     }
@@ -345,6 +399,7 @@ public class EmployeeService {
         if (!e.isActive()) {
             e.setActive(true);
             e.setDeletionRequestedAt(null);
+            audit.record(caller, e, AuditAction.EMPLOYEE_REACTIVATED, AuditService.details());
         }
         return toDetail(e);
     }

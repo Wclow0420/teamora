@@ -9,6 +9,7 @@ import java.util.UUID;
 public interface PushTokenRepository extends JpaRepository<PushToken, UUID> {
     Optional<PushToken> findByToken(String token);
     List<PushToken> findByEmployeeId(UUID employeeId);
-    void deleteByToken(String token);
+    /** Delete a token only if it belongs to this employee (a caller can't unregister someone else's device). */
+    long deleteByTokenAndEmployeeId(String token, UUID employeeId);
     void deleteByEmployeeId(UUID employeeId);
 }

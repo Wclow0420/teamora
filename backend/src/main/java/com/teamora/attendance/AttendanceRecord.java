@@ -8,8 +8,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -68,19 +66,10 @@ public class AttendanceRecord extends TenantEntity {
     private BigDecimal clockInLng;
 
     /**
-     * Front-camera selfie captured at clock-in (attendance proof), stored inline.
-     * Plain {@code byte[]} maps to JDBC VARBINARY → Postgres {@code bytea} under
-     * Hibernate 6 (no {@code @Lob}, which would map to a large-object OID and
-     * break {@code ddl-auto: validate}). Nullable — clock-in without a photo is
-     * allowed. Marked lazy (effective only with bytecode enhancement); the live
-     * board derives {@code hasPhoto} from {@code clockInPhotoType} to avoid
-     * depending on the bytes being present.
+     * Content-type of the clock-in selfie, doubling as the "has a selfie" flag. The
+     * bytes live in {@link AttendancePhoto} (attendance_photos, V23) so loading a
+     * record never loads the photo.
      */
-    @Basic(fetch = FetchType.LAZY)
-    @JdbcTypeCode(SqlTypes.VARBINARY)
-    @Column(name = "clock_in_photo", columnDefinition = "bytea")
-    private byte[] clockInPhoto;
-
     @Column(name = "clock_in_photo_type", length = 32)
     private String clockInPhotoType;
 }

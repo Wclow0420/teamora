@@ -96,7 +96,7 @@ public class SecurityConfig {
         if (origins == null || origins.isBlank() || origins.trim().equals("*")) {
             // Any origin, but never with credentials: a wildcard that also allows
             // credentials would let any website make authenticated calls.
-            config.setAllowedOriginPatterns(List.of("*"));
+            config.setAllowedOrigins(List.of("*"));
             config.setAllowCredentials(false);
         } else {
             config.setAllowedOrigins(Arrays.stream(origins.split(","))

@@ -27,6 +27,8 @@ class ClockInPhotoIT extends AbstractIntegrationTest {
     // 4 raw bytes (FF D8 FF D9) — a minimal JPEG SOI/EOI marker pair.
     private static final String SMALL_JPEG_B64 = "/9j/2Q==";
     private static final byte[] SMALL_JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xD9};
+    // The 8-byte PNG signature (89 50 4E 47 0D 0A 1A 0A).
+    private static final String SMALL_PNG_B64 = "iVBORw0KGgo=";
 
     private String owner;
 
@@ -134,7 +136,7 @@ class ClockInPhotoIT extends AbstractIntegrationTest {
         String email = createEmp(owner, "ph-du-" + System.nanoTime() + "@example.com");
         String emp = login(email, "password");
         // PNG data URL — service strips the prefix and infers image/png.
-        clockInWithPhoto(emp, "data:image/png;base64," + SMALL_JPEG_B64);
+        clockInWithPhoto(emp, "data:image/png;base64," + SMALL_PNG_B64);
         String recordId = recordIdFromLiveBoard(owner, email, true);
 
         mvc.perform(get("/api/attendance/records/" + recordId + "/photo")
@@ -144,25 +146,82 @@ class ClockInPhotoIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void getPhoto_asOtherCompanyUser_forbidden() throws Exception {
+    void getPhoto_asOtherCompanyUser_notFound() throws Exception {
         owner = register("owner1-" + System.nanoTime());
         String email = createEmp(owner, "ph-o1-" + System.nanoTime() + "@example.com");
         String emp = login(email, "password");
         clockInWithPhoto(emp, SMALL_JPEG_B64);
         String recordId = recordIdFromLiveBoard(owner, email, true);
 
-        // A DIFFERENT company's owner (admin, but wrong tenant) → 403.
+        // A DIFFERENT company's owner (admin, but wrong tenant) → 404 (existence not leaked).
         String otherOwner = register("owner2-" + System.nanoTime());
         mvc.perform(get("/api/attendance/records/" + recordId + "/photo")
                         .header("Authorization", bearer(otherOwner)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
 
-        // A DIFFERENT company's employee → 403.
+        // A DIFFERENT company's employee → 404.
         String otherEmail = createEmp(otherOwner, "ph-o2-" + System.nanoTime() + "@example.com");
         String otherEmp = login(otherEmail, "password");
         mvc.perform(get("/api/attendance/records/" + recordId + "/photo")
                         .header("Authorization", bearer(otherEmp)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getPhoto_managerOnlyForDirectReports_hrForAnyone() throws Exception {
+        long n = System.nanoTime();
+        owner = register("mgr" + n);
+        String mgrEmail = "ph-mgr-" + n + "@example.com";
+        String mgrId = createUser(owner, mgrEmail, "MANAGER", null);
+        String hrEmail = "ph-hr-" + n + "@example.com";
+        createUser(owner, hrEmail, "HR_ADMIN", null);
+        String reportEmail = "ph-rep-" + n + "@example.com";
+        createUser(owner, reportEmail, "EMPLOYEE", mgrId);
+        String otherEmail = "ph-oth-" + n + "@example.com";
+        createUser(owner, otherEmail, "EMPLOYEE", null);
+
+        String report = login(reportEmail, "password");
+        String colleague = login(otherEmail, "password");
+        clockInWithPhoto(report, SMALL_JPEG_B64);
+        clockInWithPhoto(colleague, SMALL_JPEG_B64);
+        String reportRecord = recordIdFor(owner, reportEmail);
+        String colleagueRecord = recordIdFor(owner, otherEmail);
+
+        String mgr = login(mgrEmail, "password");
+        String hr = login(hrEmail, "password");
+        // Manager: own direct report yes, someone else's no.
+        mvc.perform(get("/api/attendance/records/" + reportRecord + "/photo").header("Authorization", bearer(mgr)))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/attendance/records/" + colleagueRecord + "/photo").header("Authorization", bearer(mgr)))
                 .andExpect(status().isForbidden());
+        // HR admin: anyone in the company.
+        mvc.perform(get("/api/attendance/records/" + colleagueRecord + "/photo").header("Authorization", bearer(hr)))
+                .andExpect(status().isOk());
+        // A colleague can't see another employee's selfie.
+        mvc.perform(get("/api/attendance/records/" + reportRecord + "/photo").header("Authorization", bearer(colleague)))
+                .andExpect(status().isForbidden());
+    }
+
+    private String createUser(String ownerToken, String email, String role, String managerId) throws Exception {
+        String mgr = managerId == null ? "" : ",\"reportingManagerId\":\"" + managerId + "\"";
+        String body = "{\"fullName\":\"%s\",\"email\":\"%s\",\"password\":\"password\",\"role\":\"%s\"%s}"
+                .formatted(email, email, role, mgr);
+        var res = mvc.perform(post("/api/employees").header("Authorization", bearer(ownerToken))
+                        .contentType("application/json").content(body))
+                .andExpect(status().isCreated()).andReturn();
+        return om.readTree(res.getResponse().getContentAsString()).get("id").asText();
+    }
+
+    /** Today's attendance record id for one employee, from the live board. */
+    private String recordIdFor(String adminToken, String email) throws Exception {
+        var res = mvc.perform(get("/api/admin/attendance/live").header("Authorization", bearer(adminToken)))
+                .andExpect(status().isOk()).andReturn();
+        for (JsonNode row : om.readTree(res.getResponse().getContentAsString()).get("staff")) {
+            if (email.equals(row.path("name").asText()) && row.hasNonNull("attendanceRecordId")) {
+                return row.get("attendanceRecordId").asText();
+            }
+        }
+        throw new AssertionError("No clocked-in row for " + email);
     }
 
     @Test
@@ -183,13 +242,18 @@ class ClockInPhotoIT extends AbstractIntegrationTest {
         String email = createEmp(owner, "ph-big-" + System.nanoTime() + "@example.com");
         String emp = login(email, "password");
 
-        // ~3 MB of base64 'A' → well over the 2 MB decoded cap.
-        String big = "A".repeat(4_200_000);
+        // ~2.25 MB decoded (3 MB of base64) → over the 2 MB photo cap, under the 3.5 MB body cap.
+        String big = "A".repeat(3_000_000);
         String body = "{\"photoBase64\":\"%s\"}".formatted(big);
         mvc.perform(post("/api/attendance/clock-in").header("Authorization", bearer(emp))
                         .contentType("application/json").content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(containsString("too large")));
+        // Past the 3.5 MB request-body cap → 413 before anything is parsed.
+        String huge = "{\"photoBase64\":\"%s\"}".formatted("A".repeat(4_200_000));
+        mvc.perform(post("/api/attendance/clock-in").header("Authorization", bearer(emp))
+                        .contentType("application/json").content(huge))
+                .andExpect(status().isPayloadTooLarge());
     }
 
     @Test

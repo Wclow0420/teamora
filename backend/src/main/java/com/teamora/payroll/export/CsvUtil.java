@@ -18,17 +18,41 @@ public final class CsvUtil {
 
     private static final String LINE_SEP = "\r\n";
 
-    /** Escape a single field, quoting only when required. Null → empty. */
+    /** A plain number (e.g. "-12.50", "4,000.00") — safe to leave as-is so spreadsheets still sum it. */
+    private static final java.util.regex.Pattern PLAIN_NUMBER =
+            java.util.regex.Pattern.compile("[-+]?\\d[\\d,]*(\\.\\d+)?");
+
+    /**
+     * Escape a single field, quoting only when required. Null → empty.
+     *
+     * <p>Formula-injection guard: a cell that starts with {@code = + - @} (or a tab /
+     * CR, which some spreadsheets strip first) would be run as a formula when the
+     * file is opened, so it gets a leading {@code '} and is shown as text. Plain
+     * numbers are left alone.
+     */
     public static String escape(String value) {
         if (value == null) {
             return "";
         }
+        value = neutraliseFormula(value);
         boolean mustQuote = value.contains(",") || value.contains("\"")
                 || value.contains("\n") || value.contains("\r");
         if (!mustQuote) {
             return value;
         }
         return '"' + value.replace("\"", "\"\"") + '"';
+    }
+
+    static String neutraliseFormula(String value) {
+        if (value.isEmpty()) {
+            return value;
+        }
+        char first = value.charAt(0);
+        boolean risky = first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r';
+        if (risky && !PLAIN_NUMBER.matcher(value).matches()) {
+            return "'" + value;
+        }
+        return value;
     }
 
     /** Join one row's already-ordered fields into a CSV line (no trailing separator). */

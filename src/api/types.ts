@@ -121,6 +121,17 @@ export function isAdminRole(role: Role | null | undefined): boolean {
   return role === 'OWNER' || role === 'HR_ADMIN';
 }
 
+/**
+ * A directory row from `GET /api/employees`. The list never carries salary,
+ * NRIC, EPF/SOCSO/tax numbers or bank details — open the detail endpoint
+ * (`useEmployee`) for those (OWNER/HR_ADMIN only).
+ */
+export type EmployeeSummary = Pick<
+  EmployeeResponse,
+  'id' | 'email' | 'fullName' | 'initial' | 'role' | 'jobTitle' | 'department' | 'staffId' | 'active'
+> &
+  Partial<Pick<EmployeeResponse, 'reportingManagerName' | 'workLocationName' | 'phone' | 'joinDate'>>;
+
 export type EmployeeResponse = {
   id: string;
   email: string;
@@ -788,7 +799,8 @@ export type DashboardSummary = {
   presentToday: number;
   onLeaveToday: number;
   pendingApprovals: number;
-  payrollDueLabel: string;
+  /** Null for managers — payroll totals are OWNER/HR_ADMIN only. */
+  payrollDueLabel: string | null;
   week: DashboardWeek;
   activity: DashboardActivity[];
 };

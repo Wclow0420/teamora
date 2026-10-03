@@ -3,7 +3,10 @@
 # in-Docker Maven build. Dev convenience only; the real image is built by
 # Dockerfile. Rebuild the jar first, then: docker build -f Dockerfile.fast -t backend-api .
 FROM eclipse-temurin:21-jre
+RUN groupadd --system --gid 10001 teamora \
+    && useradd --system --uid 10001 --gid teamora --no-create-home --shell /usr/sbin/nologin teamora
 WORKDIR /app
-COPY target/teamora-api-1.0.0.jar app.jar
+COPY --chown=teamora:teamora target/teamora-api-1.0.0.jar app.jar
+USER teamora:teamora
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]

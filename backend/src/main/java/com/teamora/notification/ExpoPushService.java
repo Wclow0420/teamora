@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -24,7 +25,20 @@ public class ExpoPushService {
     private static final String EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
     private final PushTokenRepository pushTokens;
-    private final RestClient restClient = RestClient.create();
+    /** Never let a slow Expo endpoint pin the async pool: 5 s to connect, 10 s to answer. */
+    static final int CONNECT_TIMEOUT_MS = 5_000;
+    static final int READ_TIMEOUT_MS = 10_000;
+
+    private final RestClient restClient = RestClient.builder()
+            .requestFactory(timeouts())
+            .build();
+
+    private static SimpleClientHttpRequestFactory timeouts() {
+        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        f.setReadTimeout(READ_TIMEOUT_MS);
+        return f;
+    }
 
     @Async
     @Transactional(readOnly = true)

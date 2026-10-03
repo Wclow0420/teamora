@@ -1,5 +1,7 @@
 package com.teamora.payroll;
 
+import com.teamora.audit.AuditAction;
+import com.teamora.audit.AuditService;
 import com.teamora.claim.ClaimRepository;
 import com.teamora.claim.ClaimStatus;
 import com.teamora.common.exception.BadRequestException;
@@ -40,6 +42,7 @@ public class PayrollService {
     private final OvertimeRepository overtime;
     private final ClaimRepository claims;
     private final CompensationService compensationService;
+    private final AuditService audit;
 
     // ---------------- Staff reads ----------------
 
@@ -234,35 +237,51 @@ public class PayrollService {
         return buildRunResponse(ym, companyId, run, skipped);
     }
 
-    /** Approve a period's run: DRAFT/IN_REVIEW payslips → APPROVED. */
+    /** Approve a period's run: DRAFT/IN_REVIEW payslips → APPROVED (audited as {@code actor}). */
     @Transactional
-    public PayrollRunResponse approveRun(String period, UUID companyId) {
+    public PayrollRunResponse approveRun(String period, Employee actor) {
+        UUID companyId = actor.getCompany().getId();
         YearMonth ym = parsePeriod(period);
         List<Payslip> run = requireRun(ym, companyId);
+        int changed = 0;
+        BigDecimal net = BigDecimal.ZERO;
         for (Payslip p : run) {
             if (p.getStatus() == PayslipStatus.DRAFT || p.getStatus() == PayslipStatus.IN_REVIEW) {
                 p.setStatus(PayslipStatus.APPROVED);
+                changed++;
+                net = net.add(p.getNet());
             }
         }
         payslips.saveAll(run);
+        if (changed > 0) {
+            audit.record(actor, null, AuditAction.PAYROLL_APPROVED,
+                    AuditService.details("period", ym.toString(), "payslips", changed, "netTotal", net));
+        }
         return buildRunResponse(ym, companyId, run, skippedCount(companyId));
     }
 
-    /** Mark an approved run as paid: APPROVED payslips → PAID. */
+    /** Mark an approved run as paid: APPROVED payslips → PAID (audited as {@code actor}). */
     @Transactional
-    public PayrollRunResponse markRunPaid(String period, UUID companyId) {
+    public PayrollRunResponse markRunPaid(String period, Employee actor) {
+        UUID companyId = actor.getCompany().getId();
         YearMonth ym = parsePeriod(period);
         List<Payslip> run = requireRun(ym, companyId);
         boolean anyApproved = run.stream().anyMatch(p -> p.getStatus() == PayslipStatus.APPROVED);
         if (!anyApproved) {
             throw new BadRequestException("Approve the payroll run before marking it paid.");
         }
+        int changed = 0;
+        BigDecimal net = BigDecimal.ZERO;
         for (Payslip p : run) {
             if (p.getStatus() == PayslipStatus.APPROVED) {
                 p.setStatus(PayslipStatus.PAID);
+                changed++;
+                net = net.add(p.getNet());
             }
         }
         payslips.saveAll(run);
+        audit.record(actor, null, AuditAction.PAYROLL_MARKED_PAID,
+                AuditService.details("period", ym.toString(), "payslips", changed, "netTotal", net));
         return buildRunResponse(ym, companyId, run, skippedCount(companyId));
     }
 

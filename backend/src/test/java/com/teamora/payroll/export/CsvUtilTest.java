@@ -51,4 +51,21 @@ class CsvUtilTest {
                 List.of("Amir Hakim", "4,285.50")));
         assertThat(doc).isEqualTo("Employee,Net Pay\r\nAmir Hakim,\"4,285.50\"\r\n");
     }
+
+    @Test
+    void formulaLikeCells_arePrefixedWithAQuote() {
+        assertThat(CsvUtil.escape("=HYPERLINK(\"http://x\")")).isEqualTo("\"'=HYPERLINK(\"\"http://x\"\")\"");
+        assertThat(CsvUtil.escape("+60123")).isEqualTo("+60123");          // a plain number stays a number
+        assertThat(CsvUtil.escape("+cmd|' /C calc'!A0")).isEqualTo("'+cmd|' /C calc'!A0");
+        assertThat(CsvUtil.escape("-2+3")).isEqualTo("'-2+3");
+        assertThat(CsvUtil.escape("@SUM(A1:A9)")).isEqualTo("'@SUM(A1:A9)");
+        assertThat(CsvUtil.escape("\t=1+1")).isEqualTo("'\t=1+1");
+    }
+
+    @Test
+    void plainNumbers_includingNegatives_areLeftAlone() {
+        assertThat(CsvUtil.escape("-12.50")).isEqualTo("-12.50");
+        assertThat(CsvUtil.escape("-4,000.00")).isEqualTo("\"-4,000.00\"");
+        assertThat(CsvUtil.escape("900101-14-5678")).isEqualTo("900101-14-5678");
+    }
 }

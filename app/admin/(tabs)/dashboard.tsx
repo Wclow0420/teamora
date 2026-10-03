@@ -62,7 +62,7 @@ export default function Dashboard() {
     { icon: 'users', value: d ? String(d.presentToday) : '—', label: d ? `/${d.headcount} present` : 'present', color: palette.sage, bg: tint.sage },
     { icon: 'sun', value: d ? String(d.onLeaveToday) : '—', label: 'on leave', color: palette.coral, bg: tint.coral },
     { icon: 'check', value: d ? String(d.pendingApprovals) : '—', label: 'approvals', color: palette.amber, bg: tint.amber },
-    { icon: 'wallet', value: d ? `RM ${d.payrollDueLabel}` : '—', label: 'payroll due', color: palette.violet, bg: tint.violet },
+    { icon: 'wallet', value: d?.payrollDueLabel ? `RM ${d.payrollDueLabel}` : '—', label: 'payroll due', color: palette.violet, bg: tint.violet },
   ];
 
   return (

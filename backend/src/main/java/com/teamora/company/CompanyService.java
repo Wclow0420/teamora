@@ -49,7 +49,7 @@ public class CompanyService {
         if (req.registrationNo() != null) company.setRegistrationNo(req.registrationNo());
         if (req.epfNo() != null) company.setEpfNo(req.epfNo());
         if (req.socsoNo() != null) company.setSocsoNo(req.socsoNo());
-        if (req.email() != null) company.setEmail(req.email());
+        if (req.email() != null) company.setEmail(com.teamora.auth.AuthService.normaliseEmail(req.email()));
         if (req.phone() != null) company.setPhone(req.phone());
         if (req.address() != null) company.setAddress(req.address());
         return company;

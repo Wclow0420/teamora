@@ -1,5 +1,7 @@
 package com.teamora.claim.dto;
 
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.DecimalMax;
 import com.teamora.claim.ClaimCategory;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -17,10 +19,11 @@ import java.time.LocalDate;
  */
 public record SubmitClaimRequest(
         @NotNull ClaimCategory category,
-        @NotBlank String title,
-        @NotNull @DecimalMin("0.0") BigDecimal amount,
+        @NotBlank @Size(max = 120, message = "Title must be at most 120 characters") String title,
+        @NotNull @DecimalMin("0.0")
+        @DecimalMax(value = "100000.00", message = "Claim amount can't be more than RM 100,000") BigDecimal amount,
         @NotNull LocalDate claimDate,
-        String receiptUrl,
+        @Size(max = 512) String receiptUrl,
         String receiptBase64
 ) {
 }

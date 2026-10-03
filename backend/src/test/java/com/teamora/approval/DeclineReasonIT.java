@@ -137,15 +137,20 @@ class DeclineReasonIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.decisionNote").value(nullValue()));
         org.assertj.core.api.Assertions.assertThat(latestNotificationBody(co.emp())).endsWith("was declined.");
 
-        // A long claim title + a max-length reason can't overflow the notification body.
-        String longTitle = "T".repeat(250);
+        // Claim titles are capped at 120 characters (400 above that)…
+        mvc.perform(post("/api/claims").header("Authorization", bearer(co.emp()))
+                .contentType("application/json").content(claim.formatted("T".repeat(121))))
+                .andExpect(status().isBadRequest());
+        // …and a max-length title + a max-length reason can't overflow the notification body.
+        String longTitle = "T".repeat(120);
         String longClaim = id(mvc.perform(post("/api/claims").header("Authorization", bearer(co.emp()))
                 .contentType("application/json").content(claim.formatted(longTitle))).andExpect(status().isOk()));
         mvc.perform(post("/api/admin/claims/" + longClaim + "/reject").header("Authorization", bearer(co.owner()))
                         .contentType("application/json").content("{\"reason\":\"" + "z".repeat(300) + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.decisionNote").value("z".repeat(300)));
-        org.assertj.core.api.Assertions.assertThat(latestNotificationBody(co.emp())).hasSize(500).endsWith("…");
+        org.assertj.core.api.Assertions.assertThat(latestNotificationBody(co.emp()))
+                .hasSizeLessThanOrEqualTo(500).endsWith("z".repeat(300));
     }
 
     @Test

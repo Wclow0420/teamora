@@ -131,7 +131,7 @@ public class EmployeeSeeder implements CommandLineRunner {
 
     private Employee emp(Company company, String email, String name, Role role, String title, String dept, String staffId, String pw, LocalDate joined) {
         Employee e = Employee.builder()
-                .email(email)
+                .email(com.teamora.auth.AuthService.normaliseEmail(email))
                 .passwordHash(pw)
                 .fullName(name)
                 .role(role)

@@ -23,6 +23,9 @@ class ClaimReceiptIT extends AbstractIntegrationTest {
     // 4 raw bytes (FF D8 FF D9) — a minimal JPEG SOI/EOI marker pair.
     private static final String SMALL_JPEG_B64 = "/9j/2Q==";
     private static final byte[] SMALL_JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xD9};
+    // The 8-byte PNG signature (89 50 4E 47 0D 0A 1A 0A).
+    private static final String SMALL_PNG_B64 = "iVBORw0KGgo=";
+    private static final byte[] SMALL_PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
 
     private record Co(String owner, String hr, String mgr, String otherMgr, String a, String b) {}
 
@@ -135,12 +138,25 @@ class ClaimReceiptIT extends AbstractIntegrationTest {
     @Test
     void dataUrlPrefixStripped_andTypeInferred() throws Exception {
         Co co = setup();
-        String id = submitOk(co.a(), "data:image/png;base64," + SMALL_JPEG_B64, true);
+        String id = submitOk(co.a(), "data:image/png;base64," + SMALL_PNG_B64, true);
         var res = receipt(co.a(), id)
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", containsString("image/png")))
                 .andReturn();
-        assertArrayEquals(SMALL_JPEG, res.getResponse().getContentAsByteArray());
+        assertArrayEquals(SMALL_PNG, res.getResponse().getContentAsByteArray());
+    }
+
+    @Test
+    void typeComesFromTheBytes_notTheDeclaredDataUrl_andNonImagesAreRefused() throws Exception {
+        Co co = setup();
+        // JPEG bytes labelled as PNG → stored and served as what they really are.
+        String id = submitOk(co.a(), "data:image/png;base64," + SMALL_JPEG_B64, true);
+        receipt(co.a(), id).andExpect(header().string("Content-Type", containsString("image/jpeg")));
+        // A GIF (not on the whitelist), plain text, and a non-image data URL are 400.
+        submit(co.a(), "R0lGODlhAQABAAAAACw=").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("JPEG, PNG or HEIC")));
+        submit(co.a(), "aGVsbG8gd29ybGQ=").andExpect(status().isBadRequest());
+        submit(co.a(), "data:text/html;base64," + SMALL_JPEG_B64).andExpect(status().isBadRequest());
     }
 
     @Test
@@ -179,9 +195,13 @@ class ClaimReceiptIT extends AbstractIntegrationTest {
     @Test
     void oversizedOrInvalidReceipt_400_andNoClaimCreated() throws Exception {
         Co co = setup();
-        // ~3 MB of base64 'A' → well over the 2 MB decoded cap.
-        submit(co.a(), "A".repeat(4_200_000))
+        // ~2.25 MB decoded (3 MB of base64) → over the 2 MB photo cap, under the 3.5 MB body cap.
+        submit(co.a(), "A".repeat(3_000_000))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("too large")));
+        // Over the 3.5 MB request-body cap → refused before it's read.
+        submit(co.a(), "A".repeat(4_200_000))
+                .andExpect(status().isPayloadTooLarge())
                 .andExpect(jsonPath("$.message").value(containsString("too large")));
         submit(co.a(), "not*base64!").andExpect(status().isBadRequest());
 

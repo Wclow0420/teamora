@@ -14,7 +14,7 @@ import java.util.UUID;
  * Hard-deletes a company and every row that belongs to it, in one transaction.
  *
  * <p>Plain SQL in a fixed, FK-safe order (children before parents) — the list
- * below is every table created by the Flyway migrations (V1–V22) except
+ * below is every table created by the Flyway migrations (V1–V26) except
  * {@code flyway_schema_history}. <b>When a migration adds a tenant table, add it
  * here</b> (and to {@code CompanyDeletionIT}, which asserts zero rows per table).
  *
@@ -40,7 +40,13 @@ public class CompanyPurgeService {
         // FK-safe order: children before parents. Employee-scoped only (no company_id column):
         total += jdbc.update("DELETE FROM password_reset_codes WHERE employee_id IN " + EMPLOYEES_OF, companyId);
         total += jdbc.update("DELETE FROM refresh_tokens WHERE employee_id IN " + EMPLOYEES_OF, companyId);
-        // Company- and employee-scoped (claims carry receipt photos, attendance the clock-in selfies;
+        // Audit trail (company-scoped; points at the employees being deleted):
+        total += jdbc.update("DELETE FROM audit_events WHERE company_id = ? OR actor_id IN " + EMPLOYEES_OF
+                + " OR target_employee_id IN " + EMPLOYEES_OF, companyId, companyId, companyId);
+        // Clock-in selfies (V23) — before their attendance records:
+        total += jdbc.update("DELETE FROM attendance_photos WHERE company_id = ? OR record_id IN "
+                + "(SELECT id FROM attendance_records WHERE company_id = ?)", companyId, companyId);
+        // Company- and employee-scoped (claims carry receipt photos;
         // leave rows go before leave_types, every one of these before employees):
         for (String table : List.of("push_tokens", "notifications", "shifts", "overtime_requests", "payslips",
                 "claims", "leave_balances", "leave_requests", "attendance_records")) {
