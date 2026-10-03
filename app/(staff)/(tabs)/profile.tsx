@@ -34,9 +34,10 @@ export default function Profile() {
   const balances = useLeaveBalances();
   const payslips = usePayslips();
 
-  const leaveLeft = balances.data
-    ? formatDays(balances.data.filter((b) => b.accrual !== 'NONE').reduce((sum, b) => sum + b.remaining, 0))
-    : '—';
+  // Annual leave is the number people mean by "leave left" — summing medical,
+  // emergency etc. into one figure (e.g. "35 days") overstates what they can take.
+  const annual = balances.data?.find((b) => b.code === 'ANNUAL') ?? balances.data?.find((b) => b.accrual !== 'NONE');
+  const leaveLeft = balances.data ? (annual ? formatDays(annual.remaining) : '—') : '—';
 
   // Real payslip count (no fake placeholder) — blank until the query resolves.
   const payslipCount = payslips.data?.length ?? 0;
@@ -87,7 +88,7 @@ export default function Profile() {
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
               <StatTile value={yearsSince(me.data.joinDate)} label="Tenure" valueSize={15} />
-              <StatTile value={leaveLeft} label="Leave left" valueSize={15} />
+              <StatTile value={leaveLeft} label={annual?.code === 'ANNUAL' ? 'Annual left' : 'Leave left'} valueSize={15} />
               <StatTile value={me.data.staffId ?? '—'} label="Staff ID" valueSize={15} />
             </View>
           </>

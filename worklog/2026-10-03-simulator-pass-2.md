@@ -58,3 +58,16 @@ duplicate staff ID error, Employment save (manager + work location), join-date
 re-proration (16 → 4), Statutory & bank save, Compensation save (override shown),
 Leave entitlement override (flag set only on the changed type).
 Dev data: test employee "QA Tester" (qa.tester@lumi.com) created; Lumi company phone set.
+Also in pass 3:
+- Payroll: Approve / Mark as paid / Reports moved above the per-employee breakdown (they
+  were below every payslip — a long scroll for a real company).
+- Staff Profile "Leave left" summed every leave type (35 days for Nadia: annual + medical
+  + emergency + study) → now "Annual left", matching Home. Home claims tile lacked "RM".
+Verified on screen: new calendar event, new leave type (appears in the staff picker),
+Mark as paid (employee sees "Paid 30 September"), admin change password (old rejected,
+new accepted — demo password restored), log out, manager login + approvals inbox,
+leave application on a weekday (owner notified), overtime, claim without receipt.
+Verified by API: forgot-password reset (wrong 400, right 204, reuse 400, new password works).
+Dev data: Nadia has a pending 15 Oct annual leave, a 2.5h overtime and a RM 23.50 claim;
+"QA Townhall" event on 3 Oct; "Study Leave" type; September payroll PAID;
+qa.tester@lumi.com password is now newpass123.

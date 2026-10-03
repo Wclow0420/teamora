@@ -3042,3 +3042,13 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Employee → Leave entitlement. Retype a value as-is (e.g. "3.50" for 3.5) → Save is still disabled. Change one value → Save. Change the employee's join date afterwards.
 - **Expected:** Only real changes enable Save; Unpaid Leave isn't listed; the value you set survives the join-date change while the other types re-prorate.
 - [ ] Pass
+
+#### R5-04 — Payroll actions sit above the breakdown
+- **Steps:** Admin → Payroll for a month with a run (Draft, then Approved).
+- **Expected:** Approve / Mark as paid / Re-run and "Reports & export" appear right under the totals, before the per-employee list — no scrolling past every payslip.
+- [ ] Pass
+
+#### R5-05 — Staff figures are labelled
+- **Steps:** Staff Home → Today's summary; Staff Profile → stat tiles.
+- **Expected:** Claims pending shows "RM 0.00" (with currency). Profile shows "Annual left" equal to the Annual Leave figure on Home — not a sum of every leave type.
+- [ ] Pass

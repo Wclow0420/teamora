@@ -65,7 +65,7 @@ export default function Home() {
   const summary: { icon: IconName; value: string; label: string; color: string; num?: boolean }[] = [
     { icon: 'briefcase', value: attendanceWord(today.data?.status), label: 'Attendance', color: palette.sage },
     { icon: 'leave', value: annual ? `${annual.remaining}d` : '—', label: annual?.name ?? 'Annual leave', color: palette.coral, num: true },
-    { icon: 'receipt', value: claims.data?.pendingTotalLabel ?? '—', label: 'Claims pending', color: palette.amber, num: true },
+    { icon: 'receipt', value: claims.data ? `RM ${claims.data.pendingTotalLabel}` : '—', label: 'Claims pending', color: palette.amber, num: true },
   ];
 
   // Clocking out ends the day's record, so confirm first; the hero then flips to "Done for today".

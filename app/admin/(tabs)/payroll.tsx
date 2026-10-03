@@ -90,32 +90,34 @@ export default function Payroll() {
         )}
         {data &&
           (data.generated ? (
-            <RunView data={data} />
+            <RunView
+              data={data}
+              actions={
+                <View style={{ marginTop: -2 }}>
+                  <Actions
+                    data={data}
+                    busy={busy}
+                    onApprove={onApprove}
+                    onMarkPaid={onMarkPaid}
+                    onReRun={onRun}
+                    running={run.isPending}
+                    approving={approve.isPending}
+                    paying={markPaid.isPending}
+                  />
+                  <Button
+                    label="Reports & export"
+                    variant="ghost"
+                    icon="download"
+                    disabled={busy}
+                    onPress={() => router.push({ pathname: '/admin/payroll-export', params: { period } })}
+                    style={{ marginTop: 8 }}
+                  />
+                </View>
+              }
+            />
           ) : (
             <EmptyState busy={busy} onRun={onRun} monthName={monthName} isCurrent={isCurrent} />
           ))}
-        {data?.generated && (
-          <>
-            <Actions
-              data={data}
-              busy={busy}
-              onApprove={onApprove}
-              onMarkPaid={onMarkPaid}
-              onReRun={onRun}
-              running={run.isPending}
-              approving={approve.isPending}
-              paying={markPaid.isPending}
-            />
-            <Button
-              label="Reports & export"
-              variant="ghost"
-              icon="download"
-              disabled={busy}
-              onPress={() => router.push({ pathname: '/admin/payroll-export', params: { period } })}
-              style={{ marginTop: 12 }}
-            />
-          </>
-        )}
       </AsyncBoundary>
     </CollapsingHeaderScreen>
   );
@@ -166,7 +168,11 @@ function EmptyState({
   );
 }
 
-function RunView({ data }: { data: PayrollRun }) {
+/**
+ * `actions` render between the totals and the per-employee breakdown, so the
+ * next step (approve / mark paid) is in reach without scrolling past every payslip.
+ */
+function RunView({ data, actions }: { data: PayrollRun; actions?: React.ReactNode }) {
   return (
     <>
       {/* net hero */}
@@ -267,6 +273,8 @@ function RunView({ data }: { data: PayrollRun }) {
           </Text>
         </View>
       )}
+
+      {actions}
 
       {/* per-employee breakdown */}
       {data.lines.length > 0 && (
