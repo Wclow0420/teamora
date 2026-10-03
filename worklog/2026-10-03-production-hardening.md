@@ -37,3 +37,13 @@ Commit 03de12d accidentally included an early snapshot of ~30 backend files from
 ## Still needs owner decisions (docs/LAUNCH_DECISIONS.md)
 Hosting + backups, email provider (then the real `PasswordResetSender`), pilot company,
 lawyer review of docs/legal. Column encryption deferred.
+
+## Final simulator sweep (same day)
+Verified on screen: assign shift, admin reset password (confirm → old password 401, new 200,
+audit row PASSWORD_RESET_BY_ADMIN), deactivate (old session + login 401, "Inactive" chip in
+the staff list) and reactivate (login 200), export share sheet, offline launch ("Can't reach
+Teamora" → Try again → back in, session kept), payslip PDF share, half-day leave (AM).
+Fixed: payslip PDF was shared with a random UUID file name → "Payslip-<Name>-<YYYY-MM>.pdf";
+CSV exports now pass the CSV UTI to the share sheet (the simulator still labels it "Text
+Document" since no spreadsheet app is installed — check on a phone).
+Not testable on the simulator: camera (selfie, receipt), GPS geofence, push notifications.

@@ -31,5 +31,8 @@ export async function shareExport({
     throw new Error('Couldn’t prepare the export file. Please try again.');
   }
 
-  await Sharing.shareAsync(uri, { mimeType, dialogTitle: dialogTitle ?? filename });
+  // iOS picks share targets by UTI, not MIME type — without it a CSV is offered
+  // as a generic "Text Document" and spreadsheet apps (Numbers, Excel) aren't suggested.
+  const UTI = filename.toLowerCase().endsWith('.csv') ? 'public.comma-separated-values-text' : 'public.plain-text';
+  await Sharing.shareAsync(uri, { mimeType, UTI, dialogTitle: dialogTitle ?? filename });
 }
