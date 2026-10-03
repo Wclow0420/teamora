@@ -14,12 +14,21 @@ export default function Staff() {
   const trimmed = query.trim();
   const q = useStaff(undefined, trimmed || undefined);
   const count = q.data?.length ?? 0;
+  // Deactivated people stay listed (muted, "Inactive" chip, at the end) — this
+  // list is the only way back to their record to reactivate them or look up
+  // their history. The headcount counts active staff only.
+  const people = q.data ? [...q.data].sort((a, b) => Number(!a.active) - Number(!b.active)) : [];
+  const activeCount = q.data?.filter((e) => e.active).length ?? 0;
+  const inactiveCount = count - activeCount;
+  const headcount = `${activeCount} ${activeCount === 1 ? 'employee' : 'employees'}${
+    inactiveCount > 0 ? ` · ${inactiveCount} inactive` : ''
+  }`;
   return (
     <CollapsingHeaderScreen
       bottomInset={70}
       large
       title="Staff"
-      subtitle={q.data ? `${count} ${count === 1 ? 'employee' : 'employees'}` : 'Staff'}
+      subtitle={q.data ? headcount : 'Staff'}
       accessory={
         <Pressable onPress={() => router.push('/admin/employee-new')} hitSlop={6} accessibilityRole="button" accessibilityLabel="Add employee">
           <LinearGradient
@@ -87,12 +96,12 @@ export default function Staff() {
               )
             ) : (
               <View style={{ gap: 9 }}>
-                {q.data.map((e) => (
+                {people.map((e) => (
               <Card
                 key={e.id}
                 padding={0}
                 elevated={false}
-                style={{ borderRadius: radius.lg }}
+                style={{ borderRadius: radius.lg, opacity: e.active ? 1 : 0.6 }}
                 onPress={() =>
                   router.push({
                     pathname: '/admin/employee-edit',
@@ -114,7 +123,11 @@ export default function Staff() {
                       </Text>
                     ) : null}
                   </View>
-                  {e.department && <Chip label={e.department} dot background={tint.neutral} color={palette.soft} />}
+                  {!e.active ? (
+                    <Chip label="Inactive" size="sm" background={tint.neutral} color={palette.faint} />
+                  ) : (
+                    e.department && <Chip label={e.department} dot background={tint.neutral} color={palette.soft} />
+                  )}
                 </View>
               </Card>
                 ))}

@@ -46,9 +46,9 @@ function profileSummary(e: EmployeeResponse): string | null {
   return summaryLine([e.jobTitle, e.department]) ?? summaryLine([e.staffId, e.phone]);
 }
 
-/** "Employee · Nadia Rahman" */
+/** "Employee · Nadia Rahman" — led by "Inactive" once deactivated (reactivate lives in Employment). */
 function employmentSummary(e: EmployeeResponse): string | null {
-  return summaryLine([ROLE_LABEL[e.role], e.reportingManagerName ?? 'Owner approves']);
+  return summaryLine([e.active ? null : 'Inactive', ROLE_LABEL[e.role], e.reportingManagerName ?? 'Owner approves']);
 }
 
 /** "RM 4,000 · Mon–Fri · 8h" */

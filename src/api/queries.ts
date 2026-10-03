@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi, authApi, calendarAdminApi, calendarApi, claimApi, companyApi, companySettingsApi, dashboardApi, employeeApi, leaveApi, leaveBalanceAdminApi, leaveTypeApi, notificationApi, overtimeApi, payrollApi, payrollExportApi, scheduleApi, workLocationApi } from './endpoints';
 import { getRefreshToken } from './tokenStore';
-import type { ApplyLeaveBody, AssignShiftBody, ChangePasswordBody, ClockInBody, ResetPasswordWithCodeBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody, ImportHolidayItem } from './types';
+import type { AccountDeletionRequestBody, ApplyLeaveBody, DeleteCompanyBody, AssignShiftBody, ChangePasswordBody, ClockInBody, ResetPasswordWithCodeBody, CreateCompanyEventBody, CreateEmployeeBody, CreateLeaveTypeBody, CreateWorkLocationBody, OverrideLeaveEntitlementBody, Role, SubmitClaimBody, SubmitOvertimeBody, UpdateCompanyBody, UpdateCompanyEventBody, UpdateCompanySettingsBody, UpdateEmployeeBody, UpdateLeaveTypeBody, UpdateMyDetailsBody, UpdateWorkLocationBody, ImportHolidayItem } from './types';
 
 /** Centralised query keys. */
 export const qk = {
@@ -400,8 +400,47 @@ export function useTransferOwnership() {
   });
 }
 
+/**
+ * Deactivate / reactivate a team member. Their record (and payroll history)
+ * stays; only their access changes — so refresh the directory, their detail,
+ * the manager pickers (a deactivated manager drops out) and the dashboard headcount.
+ */
+export function useDeactivateEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => employeeApi.deactivate(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+export function useReactivateEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => employeeApi.reactivate(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+/** Staff / HR admin: ask the company's HR admins to remove my account. */
+export function useRequestAccountDeletion() {
+  return useMutation({ mutationFn: (body: AccountDeletionRequestBody) => employeeApi.requestDeletion(body) });
+}
+
 // ---- Company (admin) ----
 export const useCompany = () => useQuery({ queryKey: qk.company, queryFn: companyApi.me });
+
+/**
+ * OWNER: permanently delete the company and all of its data. No cache work on
+ * success — the caller signs out, which clears every cached query.
+ */
+export function useDeleteCompany() {
+  return useMutation({ mutationFn: (body: DeleteCompanyBody) => companyApi.remove(body) });
+}
 
 export function useUpdateCompany() {
   const qc = useQueryClient();

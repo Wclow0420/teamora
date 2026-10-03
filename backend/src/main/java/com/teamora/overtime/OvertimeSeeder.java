@@ -6,6 +6,7 @@ import com.teamora.employee.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 /** Demo overtime so the approvals inbox has something to review. */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "teamora.seed", havingValue = "true")
 @Order(6)
 @RequiredArgsConstructor
 public class OvertimeSeeder implements CommandLineRunner {

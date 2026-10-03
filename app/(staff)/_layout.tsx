@@ -22,6 +22,7 @@ export default function StaffLayout() {
       {/* account: self-service details + password */}
       <Stack.Screen name="my-details" />
       <Stack.Screen name="change-password" />
+      <Stack.Screen name="delete-account" />
     </Stack>
   );
 }

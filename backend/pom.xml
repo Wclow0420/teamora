@@ -40,6 +40,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
+    <!-- Health endpoint only (/actuator/health) for the load balancer / compose healthcheck. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
 
     <!-- Database + migrations -->
     <dependency>

@@ -9,6 +9,9 @@ export default function AuthLayout() {
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
       <Stack.Screen name="forgot-password" />
+      {/* legal — also pushed from both Profile screens while signed in */}
+      <Stack.Screen name="privacy" />
+      <Stack.Screen name="terms" />
     </Stack>
   );
 }

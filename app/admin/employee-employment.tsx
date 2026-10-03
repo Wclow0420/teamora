@@ -6,10 +6,18 @@ import { AsyncBoundary } from '@/components/layout/AsyncBoundary';
 import { Button, Chip, DateField, Icon, ScreenHeader, SelectChips, toISODate, type SelectOption } from '@/components/ui';
 import { ReportingManagerField } from '@/components/ReportingManagerField';
 import { WorkLocationField } from '@/components/WorkLocationField';
-import { useEmployee, useMe, useTransferOwnership, useUpdateEmployee } from '@/api/queries';
+import {
+  useDeactivateEmployee,
+  useEmployee,
+  useMe,
+  useReactivateEmployee,
+  useTransferOwnership,
+  useUpdateEmployee,
+} from '@/api/queries';
 import { ApiError } from '@/api/client';
+import { alertError } from '@/lib/errors';
 import { isAdminRole, type Role, type UpdateEmployeeBody } from '@/api/types';
-import { palette, font, spacing, tint } from '@/theme';
+import { palette, font, radius, spacing, tint } from '@/theme';
 
 type EditableRole = Extract<Role, 'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'>;
 
@@ -42,6 +50,8 @@ export default function EmployeeEmployment() {
   const me = useMe();
   const update = useUpdateEmployee();
   const transfer = useTransferOwnership();
+  const deactivate = useDeactivateEmployee();
+  const reactivate = useReactivateEmployee();
 
   const name = detail.data?.fullName ?? params.name ?? 'Employee';
   const targetIsOwner = detail.data?.role === 'OWNER';
@@ -51,6 +61,10 @@ export default function EmployeeEmployment() {
   // OWNER/HR_ADMIN can set a temporary password for anyone but the owner (the
   // server 403s an HR admin resetting the owner). Your own goes via Profile.
   const canResetPassword = !!detail.data && isAdminRole(me.data?.role) && !targetIsOwner && !isSelf;
+  // Same rule for removing access: OWNER/HR_ADMIN, never yourself, never the owner.
+  const canToggleAccess = canResetPassword;
+  const isInactive = detail.data?.active === false;
+  const accessBusy = deactivate.isPending || reactivate.isPending;
 
   const [role, setRole] = useState<EditableRole>('EMPLOYEE');
   const [reportingManagerId, setReportingManagerId] = useState<string | undefined>(undefined);
@@ -115,9 +129,58 @@ export default function EmployeeEmployment() {
     );
   };
 
+  const onDeactivate = () => {
+    // A deactivated manager's direct reports fall back to the owner for approvals.
+    const approver = detail.data?.role === 'MANAGER' || detail.data?.role === 'HR_ADMIN';
+    Alert.alert(
+      `Deactivate ${name}?`,
+      `They'll be signed out and won't be able to sign in. Their attendance, leave, claims and payroll history stay on record.${
+        approver ? ' Anyone who reports to them will go to the owner for approvals.' : ''
+      } You can reactivate them later.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Deactivate',
+          style: 'destructive',
+          onPress: () =>
+            deactivate.mutate(params.id, { onError: (e) => alertError(`Couldn't deactivate ${name}`, e) }),
+        },
+      ],
+    );
+  };
+
+  const onReactivate = () => {
+    Alert.alert(`Reactivate ${name}?`, 'They can sign in again with their existing password.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reactivate',
+        onPress: () => reactivate.mutate(params.id, { onError: (e) => alertError(`Couldn't reactivate ${name}`, e) }),
+      },
+    ]);
+  };
+
   return (
     <Screen>
       <ScreenHeader back title="Employment" subtitle={name} />
+
+      {isInactive && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            padding: spacing.md,
+            borderRadius: radius.lg,
+            backgroundColor: tint.neutral,
+            marginBottom: spacing.lg,
+          }}
+        >
+          <Icon name="lock" size={16} color={palette.soft} />
+          <Text style={[font(600), { flex: 1, fontSize: 12.5, lineHeight: 18, color: palette.soft }]}>
+            Account deactivated — {name} can't sign in. Their records are kept.
+          </Text>
+        </View>
+      )}
 
       <AsyncBoundary loading={detail.isLoading} error={detail.error} onRetry={detail.refetch}>
         <View style={{ gap: 14 }}>
@@ -185,7 +248,7 @@ export default function EmployeeEmployment() {
                 }
               />
             )}
-            {canTransfer && (
+            {canTransfer && !isInactive && (
               <Button
                 label={transfer.isPending ? 'Transferring…' : 'Transfer ownership'}
                 icon="shield"
@@ -194,6 +257,24 @@ export default function EmployeeEmployment() {
                 onPress={onTransfer}
               />
             )}
+            {canToggleAccess &&
+              (isInactive ? (
+                <Button
+                  label={reactivate.isPending ? 'Reactivating…' : 'Reactivate account'}
+                  icon="check"
+                  variant="light"
+                  disabled={accessBusy}
+                  onPress={onReactivate}
+                />
+              ) : (
+                <Button
+                  label={deactivate.isPending ? 'Deactivating…' : 'Deactivate account'}
+                  icon="lock"
+                  variant="ghost"
+                  disabled={accessBusy}
+                  onPress={onDeactivate}
+                />
+              ))}
           </View>
         </View>
       </AsyncBoundary>

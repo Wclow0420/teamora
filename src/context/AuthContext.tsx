@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '@/api/endpoints';
 import { ApiError, setUnauthorizedHandler } from '@/api/client';
 import { queryClient } from '@/api/queryClient';
@@ -40,21 +40,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
   const [employee, setEmployee] = useState<EmployeeResponse | null>(null);
 
-  const signOut = useCallback(async () => {
-    await unregisterPushToken(); // while still authenticated
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        await authApi.logout(refreshToken);
-      } catch {
-        // ignore — we clear locally regardless
+  // Single-flight sign-out. When the account no longer exists server-side (the
+  // company was just deleted, or HR deactivated it), the push-token removal
+  // below 401s, the client's failed refresh calls the unauthorized handler —
+  // which is signOut again. Without this guard that loops; with it the nested
+  // call just joins the sign-out already in progress.
+  const signingOut = useRef<Promise<void> | null>(null);
+
+  const signOut = useCallback(() => {
+    if (signingOut.current) return signingOut.current;
+    const run = (async () => {
+      await unregisterPushToken(); // while still authenticated
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        try {
+          await authApi.logout(refreshToken);
+        } catch {
+          // ignore — we clear locally regardless
+        }
       }
-    }
-    await clearTokens();
-    // Drop every cached response so the next account never sees this one's data.
-    queryClient.clear();
-    setEmployee(null);
-    setStatus('unauthenticated');
+      await clearTokens();
+      // Drop every cached response so the next account never sees this one's data.
+      queryClient.clear();
+      setEmployee(null);
+      setStatus('unauthenticated');
+    })().finally(() => {
+      signingOut.current = null;
+    });
+    signingOut.current = run;
+    return run;
   }, []);
 
   /**

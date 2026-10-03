@@ -36,7 +36,8 @@ export default function ShiftAssign() {
   const [shiftType, setShiftType] = useState<ShiftType>('MORNING');
   const [error, setError] = useState<string | null>(null);
 
-  const employeeOptions: SelectOption<string>[] = (staff.data ?? []).map((e) => ({
+  // Deactivated people can't work shifts — leave them out of the picker.
+  const employeeOptions: SelectOption<string>[] = (staff.data ?? []).filter((e) => e.active).map((e) => ({
     value: e.id,
     label: e.fullName,
   }));

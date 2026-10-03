@@ -91,6 +91,20 @@ export default function Register() {
           style={{ marginTop: 4 }}
         />
       </View>
+
+      <View style={{ marginTop: 'auto', paddingTop: 24, alignItems: 'center' }}>
+        <Text style={[font(500), { fontSize: 11, lineHeight: 16, color: palette.faint, textAlign: 'center' }]}>
+          By creating a company you agree to Teamora's{' '}
+          <Text accessibilityRole="link" onPress={() => router.push('/terms')} style={[font(700), { color: palette.soft, textDecorationLine: 'underline' }]}>
+            Terms
+          </Text>
+          {' & '}
+          <Text accessibilityRole="link" onPress={() => router.push('/privacy')} style={[font(700), { color: palette.soft, textDecorationLine: 'underline' }]}>
+            Privacy
+          </Text>
+          .
+        </Text>
+      </View>
     </Screen>
   );
 }

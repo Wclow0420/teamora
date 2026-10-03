@@ -3052,3 +3052,27 @@ Cases for behaviour that changed after the first QA pass. Same format and accoun
 - **Steps:** Staff Home → Today's summary; Staff Profile → stat tiles.
 - **Expected:** Claims pending shows "RM 0.00" (with currency). Profile shows "Annual left" equal to the Annual Leave figure on Home — not a sum of every leave type.
 - [ ] Pass
+
+---
+
+## L. Account deletion, deactivation, privacy (added 3 Oct 2026)
+
+#### R6-01 — Employee asks for account deletion
+- **Steps:** Staff → Profile → "Delete my account" → optional reason → Send request.
+- **Expected:** "Request sent" with today's date; HR admins and the owner get an "Account deletion request" notification (with the reason if given). Sending again within 24h sends nothing new. The owner does not see this row (they get "Delete company and account").
+- [ ] Pass
+
+#### R6-02 — Deactivate and reactivate an employee
+- **Steps:** Admin → employee → Employment → Deactivate account → confirm. Try to use the app on that employee's phone; try to sign in. Then Reactivate.
+- **Expected:** Their open session stops working at once and sign-in fails; they show "Inactive" in the staff list (greyed, at the bottom) and are left out of payroll runs and shift assignment; their history stays. Deactivating a manager warns that their reports go to the owner. After Reactivate they can sign in again. You cannot deactivate yourself or the owner.
+- [ ] Pass
+
+#### R6-03 — Owner deletes the company (use a throwaway company)
+- **Steps:** Register a new company → Profile → "Delete company and account" (or Company settings → Danger zone). Read the list; tap "Go to Payroll"; come back; type the company name and password → Delete everything → confirm.
+- **Expected:** Button stays disabled until the name matches; wrong password shows an error; on success "Company deleted" and you land on onboarding; signing in with that owner fails; other companies are untouched.
+- [ ] Pass
+
+#### R6-04 — Privacy notice and terms
+- **Steps:** Login and Register footers → Terms / Privacy; Profile (staff and admin) → Privacy & terms.
+- **Expected:** Both documents open signed in or out, show "Draft — pending legal review", and describe only what the app actually collects (selfie optional, location only at clock-in with an assigned site).
+- [ ] Pass

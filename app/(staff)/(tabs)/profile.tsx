@@ -15,7 +15,7 @@ type MenuItem = {
   meta?: string;
   color: string;
   bg: string;
-  href: '/payroll' | '/leave' | '/claims' | '/notifications' | '/my-details' | '/change-password';
+  href: '/payroll' | '/leave' | '/claims' | '/notifications' | '/my-details' | '/change-password' | '/privacy';
 };
 
 /** Whole-number-ish years since an ISO join date, e.g. "2.3 yrs". */
@@ -55,6 +55,7 @@ export default function Profile() {
   const account: MenuItem[] = [
     { icon: 'user', label: 'My details', color: palette.coral, bg: tint.coral, href: '/my-details' },
     { icon: 'lock', label: 'Change password', color: palette.soft, bg: tint.neutral, href: '/change-password' },
+    { icon: 'shield', label: 'Privacy & terms', color: palette.violet, bg: tint.violet, href: '/privacy' },
   ];
 
   const onLogout = () => {
@@ -118,6 +119,16 @@ export default function Profile() {
       <Pressable onPress={onLogout} accessibilityRole="button" accessibilityLabel="Log out" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 }}>
         <Icon name="logout" size={18} color={palette.danger} />
         <Text style={[font(700), { fontSize: 13.5, color: palette.danger }]}>Log out</Text>
+      </Pressable>
+
+      {/* account deletion (App Store 5.1.1(v)) — deliberately quiet */}
+      <Pressable
+        onPress={() => router.push('/delete-account')}
+        accessibilityRole="button"
+        hitSlop={8}
+        style={{ alignSelf: 'center', marginTop: 22, paddingVertical: 4 }}
+      >
+        <Text style={[font(600), { fontSize: 12, color: palette.faint }]}>Delete my account</Text>
       </Pressable>
     </CollapsingHeaderScreen>
   );

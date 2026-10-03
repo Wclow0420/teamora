@@ -1,6 +1,8 @@
 import { api } from './client';
 import { API_BASE_URL } from './config';
 import {
+  AccountDeletionRequestBody,
+  AccountDeletionRequestResponse,
   ApplyLeaveBody,
   AttendanceSummary,
   AuthResponse,
@@ -24,6 +26,7 @@ import {
   CreateLeaveTypeBody,
   CreateWorkLocationBody,
   DashboardSummary,
+  DeleteCompanyBody,
   EmployeeResponse,
   ExportFile,
   ExportType,
@@ -95,11 +98,20 @@ export const employeeApi = {
   /** OWNER/HR_ADMIN sets a temporary password for a team member. */
   resetPassword: (id: string, body: ResetPasswordBody) =>
     api.post<void>(`/api/employees/${id}/reset-password`, body),
+  /** Any non-OWNER asks their HR admins (OWNER + HR_ADMIN are notified) to remove their account. */
+  requestDeletion: (body: AccountDeletionRequestBody) =>
+    api.post<AccountDeletionRequestResponse>('/api/employees/me/deletion-request', body),
+  /** OWNER/HR_ADMIN: remove someone's access (signed out, can't log in) — their records stay. */
+  deactivate: (id: string) => api.post<EmployeeResponse>(`/api/employees/${id}/deactivate`),
+  /** OWNER/HR_ADMIN: give a deactivated person their access back. */
+  reactivate: (id: string) => api.post<EmployeeResponse>(`/api/employees/${id}/reactivate`),
 };
 
 export const companyApi = {
   me: () => api.get<CompanyResponse>('/api/companies/me'),
   update: (body: UpdateCompanyBody) => api.patch<CompanyResponse>('/api/companies/me', body),
+  /** OWNER only. Permanently erases the company and every row that belongs to it (→ 204). */
+  remove: (body: DeleteCompanyBody) => api.post<void>('/api/companies/me/delete', body),
 };
 
 export const companySettingsApi = {

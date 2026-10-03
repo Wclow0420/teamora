@@ -200,6 +200,8 @@ Import from the barrel: `import { Button, Card, Chip, ... } from '@/components/u
 | `TextField`    | Form text input (label, error, themed). Keyboard-aware via `Screen`. |
 | `SelectChips`  | Single/multi-select chip group for forms (role, type pickers). |
 | `DateField`    | Tap-to-pick date row (native picker). Used in submit forms.    |
+| `PointList`    | Icon + text bullet rows in a card (legal, "what happens" lists). |
+| `MonthStepper` | ‹ Month › header control for month-scoped screens.             |
 | `AsyncBoundary`| (in `layout/`) Gates a data section on a query's loading/error, with retry. |
 
 **Adding a component:** put presentational components in `ui/`, give it a typed
@@ -360,13 +362,13 @@ needed. Full details in `backend/README.md`.
 - **Layout:** package-by-feature under `com.teamora` (`auth`, `company`,
   `employee`, `attendance`, `leave`, `claim`, `overtime`, `payroll`, `calendar`,
   `schedule`, `notification`, + `config`, `security`, `common`, `seed`).
-- **Migrations:** currently `V1`–`V21` (init → multi-tenancy & roles →
+- **Migrations:** currently `V1`–`V22` (init → multi-tenancy & roles →
   reporting-manager + single-owner → overtime → schedule → company events →
   notifications → push tokens → employee monthly_salary → tax profile + payslip PCB →
   configurable comp + leave types → work locations → clock-in photo → employee
   statutory/bank → partial-day leave → leave accrual/carry-forward → claim receipt
   photo → QA round 2 (work start time, late grace, override flag, per-company
-  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks → decline reasons).
+  staff id) → work start time as `HH:mm` text → password reset codes + attendance breaks → decline reasons → employee deletion requests).
 - **Wall-clock times are stored as `HH:mm` text** (`common.HhMmConverter`), not SQL
   `TIME` — a `TIME` column goes through the JDBC time-zone conversion and a
   migration default reads back shifted.

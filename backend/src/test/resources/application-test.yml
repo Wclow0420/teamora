@@ -1,5 +1,18 @@
 # Test profile (activated by AbstractIntegrationTest).
 teamora:
+  # The integration tests log in as the demo accounts.
+  seed: true
+  jwt:
+    # Test-only signing key (>= 32 bytes). Never used outside the test suite.
+    secret: test-only-jwt-secret-for-the-integration-suite-0123456789
   password-reset:
     # Tests read the one-time code from the response instead of an inbox.
     expose-code: true
+  # Every test signs in from MockMvc's 127.0.0.1, so the real limits would trip
+  # across the suite. RateLimitIT overrides these with tiny values.
+  rate-limit:
+    login-per-email: { max: 100000, window: 15m }
+    login-per-ip: { max: 100000, window: 15m }
+    register-per-ip: { max: 100000, window: 1m }
+    forgot-password-per-ip: { max: 100000, window: 1m }
+    reset-password-per-ip: { max: 100000, window: 15m }

@@ -544,6 +544,18 @@ export type UpdateCompanyBody = {
   address?: string;
 };
 
+/**
+ * Owner-only "delete company and all data" (`POST /api/companies/me/delete` → 204).
+ * `password` is the owner's current password; `confirmName` must match the
+ * company name (case-insensitive, trimmed).
+ */
+export type DeleteCompanyBody = { password: string; confirmName: string };
+
+/** Self-service "delete my account" request (`POST /api/employees/me/deletion-request`). Reason ≤ 300 chars. */
+export type AccountDeletionRequestBody = { reason?: string };
+/** When the (still-open) request was made — ISO-8601 instant. A repeat within 24h returns the same request. */
+export type AccountDeletionRequestResponse = { requestedAt: string };
+
 export type CreateEmployeeBody = {
   fullName: string;
   email: string;

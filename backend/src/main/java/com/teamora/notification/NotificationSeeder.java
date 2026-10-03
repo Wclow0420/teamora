@@ -6,6 +6,7 @@ import com.teamora.employee.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import java.time.Instant;
 /** Demo notifications (back-dated occurred_at) so the staff feed shows Today + Earlier. */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "teamora.seed", havingValue = "true")
 @Order(9)
 @RequiredArgsConstructor
 public class NotificationSeeder implements CommandLineRunner {

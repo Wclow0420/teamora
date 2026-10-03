@@ -23,6 +23,7 @@ import {
   useAdminLeaveTypes,
   useCompany,
   useCompanySettings,
+  useMe,
   useUpdateCompany,
   useUpdateCompanySettings,
 } from '@/api/queries';
@@ -59,6 +60,7 @@ export default function CompanySettings() {
   const company = useCompany();
   const settings = useCompanySettings();
   const leaveTypes = useAdminLeaveTypes();
+  const me = useMe();
 
   return (
     <Screen>
@@ -90,7 +92,45 @@ export default function CompanySettings() {
       <AsyncBoundary loading={leaveTypes.isLoading} error={leaveTypes.error} onRetry={leaveTypes.refetch}>
         {leaveTypes.data && <LeaveTypesManager types={leaveTypes.data} />}
       </AsyncBoundary>
+
+      {/* Owner-only: deleting the company is the owner's "delete my account". */}
+      {me.data?.role === 'OWNER' && <DangerZone />}
     </Screen>
+  );
+}
+
+function DangerZone() {
+  const router = useRouter();
+  return (
+    <>
+      <View style={{ marginTop: 32 }}>
+        <SectionLabel title="Danger zone" />
+      </View>
+      <Card padding={0} style={{ borderRadius: radius['2xl'], overflow: 'hidden' }}>
+        <Pressable
+          onPress={() => router.push('/admin/delete-company')}
+          accessibilityRole="button"
+          accessibilityLabel="Delete company and all data"
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 13,
+            paddingVertical: 14,
+            paddingHorizontal: 15,
+            backgroundColor: pressed ? palette.surfaceSunken : palette.surface,
+          })}
+        >
+          <IconTile icon="x" color={palette.danger} background={tint.danger} size={38} iconSize={19} cornerRadius={12} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[font(700), { fontSize: 13.5, color: palette.danger }]}>Delete company and all data</Text>
+            <Text style={[font(500), { fontSize: 11.5, lineHeight: 16, color: palette.faint, marginTop: 3 }]}>
+              Permanently erases every staff account, attendance, leave, claims and payroll record.
+            </Text>
+          </View>
+          <Icon name="chevR" size={16} color={palette.faint} />
+        </Pressable>
+      </Card>
+    </>
   );
 }
 

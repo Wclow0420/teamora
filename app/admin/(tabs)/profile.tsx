@@ -30,7 +30,17 @@ export default function AdminProfile() {
     { icon: 'calendar', label: 'Company calendar', meta: '', color: palette.amber, bg: tint.amber, href: '/admin/calendar-events' },
     { icon: 'users', label: 'Team members', meta: '', color: palette.sage, bg: tint.sage, href: '/admin/staff' },
     { icon: 'lock', label: 'Change password', meta: '', color: palette.soft, bg: tint.neutral, href: '/admin/change-password' },
+    { icon: 'shield', label: 'Privacy & terms', meta: '', color: palette.violet, bg: tint.violet, href: '/privacy' },
   ];
+  // HR admins ask to be removed like any employee. The OWNER deletes the whole
+  // company instead (also in Company settings → Danger zone) — surfaced here too,
+  // since an owner who signed up looks for "delete my account" on Profile.
+  const deletion =
+    me.data?.role === 'HR_ADMIN'
+      ? { label: 'Delete my account', href: '/admin/delete-account' as const }
+      : me.data?.role === 'OWNER'
+        ? { label: 'Delete company and account', href: '/admin/delete-company' as const }
+        : null;
 
   const onLogout = () => {
     signOut();
@@ -92,6 +102,18 @@ export default function AdminProfile() {
         <Icon name="logout" size={18} color={palette.danger} />
         <Text style={[font(700), { fontSize: 13.5, color: palette.danger }]}>Log out</Text>
       </Pressable>
+
+      {/* account deletion (App Store 5.1.1(v)) — deliberately quiet */}
+      {deletion && (
+        <Pressable
+          onPress={() => router.push(deletion.href)}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={{ alignSelf: 'center', marginTop: 22, paddingVertical: 4 }}
+        >
+          <Text style={[font(600), { fontSize: 12, color: palette.faint }]}>{deletion.label}</Text>
+        </Pressable>
+      )}
     </CollapsingHeaderScreen>
   );
 }

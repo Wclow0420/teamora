@@ -148,8 +148,16 @@ export default function Login() {
             Demo — staff: amir@lumi.com · admin: sarah@lumi.com (password: password).
           </Text>
         )}
-        <Text style={[font(500), { fontSize: 11, color: palette.faint, textAlign: 'center' }]}>
-          By continuing you agree to Teamora's Terms &amp; Privacy.
+        <Text style={[font(500), { fontSize: 11, lineHeight: 16, color: palette.faint, textAlign: 'center' }]}>
+          By continuing you agree to Teamora's{' '}
+          <Text accessibilityRole="link" onPress={() => router.push('/terms')} style={[font(700), { color: palette.soft, textDecorationLine: 'underline' }]}>
+            Terms
+          </Text>
+          {' & '}
+          <Text accessibilityRole="link" onPress={() => router.push('/privacy')} style={[font(700), { color: palette.soft, textDecorationLine: 'underline' }]}>
+            Privacy
+          </Text>
+          .
         </Text>
       </View>
     </Screen>

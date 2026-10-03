@@ -26,6 +26,7 @@ public class PasswordResetService {
     static final Duration RATE_WINDOW = Duration.ofMinutes(15);
     static final int MAX_REQUESTS_PER_WINDOW = 3;
     static final int MAX_ATTEMPTS = 5;
+    static final Duration DAY = Duration.ofHours(24);
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -40,11 +41,17 @@ public class PasswordResetService {
     /**
      * Create + send a code for an active account, within the rate limit.
      *
+     * <p>With {@code teamora.password-reset.enabled=false} (production before an email
+     * provider exists) nothing is created or sent — the caller still gets a plain 200.
+     *
      * @return the plain code only when {@code teamora.password-reset.expose-code}
      *         is on (local dev / tests) and a code was actually created; else null.
      */
     @Transactional
     public String requestCode(String email) {
+        if (!props.passwordResetOrDefault().isEnabled()) {
+            return null;
+        }
         String code = "%06d".formatted(RANDOM.nextInt(1_000_000));
         // Hash before the lookup so the response takes as long for an unknown
         // email as for a real one (no account enumeration by timing).
@@ -58,6 +65,11 @@ public class PasswordResetService {
         Instant now = Instant.now();
         if (codes.countByEmployeeIdAndCreatedAtAfter(employee.getId(), now.minus(RATE_WINDOW))
                 >= MAX_REQUESTS_PER_WINDOW) {
+            return null;
+        }
+        // Per-account daily cap, so one inbox can't be flooded by spreading requests out.
+        if (codes.countByEmployeeIdAndCreatedAtAfter(employee.getId(), now.minus(DAY))
+                >= props.passwordResetOrDefault().maxCodesPerDayOrDefault()) {
             return null;
         }
         codes.invalidateOutstanding(employee.getId(), now);

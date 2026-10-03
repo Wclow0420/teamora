@@ -6,6 +6,7 @@ import com.teamora.employee.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import java.time.YearMonth;
 /** Demo company calendar events for the current month so the grid shows dots. */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "teamora.seed", havingValue = "true")
 @Order(8)
 @RequiredArgsConstructor
 public class CompanyEventSeeder implements CommandLineRunner {

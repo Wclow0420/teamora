@@ -1,10 +1,12 @@
 package com.teamora.config;
 
+import com.teamora.common.exception.ApiErrorWriter;
 import com.teamora.security.CustomUserDetailsService;
 import com.teamora.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -36,6 +38,7 @@ public class SecurityConfig {
             "/api/auth/reset-password",
             "/error",  // the servlet ERROR dispatch (after sendError) must not be re-secured
             "/actuator/health",
+            "/actuator/health/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
@@ -44,6 +47,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final CustomUserDetailsService userDetailsService;
     private final TeamoraProperties props;
+    private final ApiErrorWriter errorWriter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -54,9 +58,10 @@ public class SecurityConfig {
                 // 401 when not authenticated; 403 when authenticated but not permitted.
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->
-                                response.sendError(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                                errorWriter.write(request, response, HttpStatus.UNAUTHORIZED, "Authentication required"))
                         .accessDeniedHandler((request, response, deniedException) ->
-                                response.sendError(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN, "Forbidden")))
+                                errorWriter.write(request, response, HttpStatus.FORBIDDEN,
+                                        "You do not have permission to perform this action")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC).permitAll()
                         .requestMatchers("/api/admin/**").hasAnyRole("OWNER", "HR_ADMIN", "MANAGER")
@@ -87,15 +92,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        String origins = props.cors().allowedOrigins();
-        if (origins == null || origins.isBlank() || origins.equals("*")) {
+        String origins = props.cors() == null ? null : props.cors().allowedOrigins();
+        if (origins == null || origins.isBlank() || origins.trim().equals("*")) {
+            // Any origin, but never with credentials: a wildcard that also allows
+            // credentials would let any website make authenticated calls.
             config.setAllowedOriginPatterns(List.of("*"));
+            config.setAllowCredentials(false);
         } else {
-            config.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).toList());
+            config.setAllowedOrigins(Arrays.stream(origins.split(","))
+                    .map(String::trim).filter(o -> !o.isEmpty()).toList());
+            config.setAllowCredentials(true);
         }
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        config.setExposedHeaders(List.of("X-Request-Id", "Retry-After"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
